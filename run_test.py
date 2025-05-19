@@ -11,7 +11,7 @@ def main():
     db_terms = [
         'customer', 'product', 'transaction', 
         'payment', 'shipping', 'invoice',
-        'ground', 'cloud', 'server',
+        'ground',  'server',
         '데이터베이스', '테이블', '필드',
         '인덱스', '쿼리', 'svc66','log','account_no','ST주식회사','account_id' ,'서버', 'konlpy', 'XPN36'
     ]
@@ -30,11 +30,6 @@ def main():
         'ground': '그라운드',
         'cloud': '클라우드',
         'server': '서버',    
-        'database': '데이터베이스',
-        'table': '테이블',
-        'field': '필드',
-        'index': '인덱스',
-        'query': '쿼리',    
         '어카운트':'어카운트',
         'XPN36':'엑스피엔36',
         'XPN36':'엑스피엔삼심육'

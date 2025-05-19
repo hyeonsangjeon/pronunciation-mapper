@@ -29,28 +29,66 @@ pip install -e .
 
 ## 빠른 시작
 
+아래는 스크롤 없이 입력과 출력을 깔끔하게 표현한 README.md 형식입니다:
+
 ### 기본 사용법
+
+다음과 같이 PronunciationMapper를 사용할 수 있습니다:
 
 ```python
 from pronunciation_mapper import PronunciationMapper
 
 # DB 정형데이터 용어 정의
-db_terms = ["customer", "product", "transaction", "ground"]
+db_terms = [
+      'customer', 'product', 'transaction', 
+      'payment', 'shipping', 'invoice',
+      'ground',  'server',
+      '데이터베이스', '테이블', '필드',
+      '인덱스', '쿼리', 'svc66','log','account_no','ST주식회사','account_id' ,'서버', 'konlpy', 'XPN36'
+  ]
+
+# 단어사전에서 사용자 정의 Custom Vocabulary 대응 매핑 추가
+custom_mappings = {
+    'svc66':'서비스66' ,          
+    '에스티주식회사':'ST주식회사',
+    'account_no':'어커운트넘버', 
+    'account_id':'어카운트아이디',
+    'account_id':'어카아이디',
+    'transaction': '트랜잭션',
+    'payment': '페이먼트',
+    'shipping': '쉬핑',
+    'invoice': '인보이스',
+    'ground': '그라운드',
+    'cloud': '클라우드',
+    'server': '서버',    
+    '어카운트':'어카운트',
+    'XPN36':'엑스피엔36',
+    'XPN36':'엑스피엔삼심육'
+}
 
 # 매퍼 초기화
-mapper = PronunciationMapper(db_terms)
+mapper = PronunciationMapper(db_terms,  custom_mappings=custom_mappings)
+
 
 # 단일 용어 매핑
 result, score = mapper.find_closest_term("커스터머")
-print(f"매핑 결과: {result}, 점수: {score}")
-# 출력: 매핑 결과: customer, 점수: 0.0
 
 # 문장 매핑
 sentence = "그라운드에 있는 엑스피엔36 데이타배이스 써버의 트랜텍숑 로그를 확인해주세요. 서비스육십육 상품에서 삼백이십일번 트랜젝션 로그 찾아줘 어카운트넘버 사삼삼오삼칠 천국의계단. 나는 에스티주식회사 천만백부장이고 어카아이디는 아니아니 어카운트아이디는 공팔공팔팔이야"
 mapped = mapper.map_sentence(sentence)
-print(f"매핑된 문장: {mapped}")
-# 출력: 매핑된 문장: ground에 있는 XPN36 데이터베이스 server의 transaction 로그를 확인해주세요. 서비스육십육 상품에서 321번 transaction log 찾아줘 account_no 433537 천국의계단. 나는 ST주식회사 천만백부장이고 account_id는 아니아니 account_id는 080882야
 ```
+
+**단일 용어 매핑 결과:**
+```
+매핑 결과: customer, 근접 점수: 0.0, 유사도: 1.00
+```
+
+**문장 매핑 결과:**
+```
+매핑된 문장: ground에 있는 XPN36 데이터베이스 server의 transaction 로그를 확인해주세요. 서비스육십육 상품에서 321번 transaction log 찾아줘 account_no 433537 천국의계단. 나는 ST주식회사 천만백부장이고 account_id는 아니아니 account_id는 080882야
+```
+
+이렇게 코드 블록과 출력 블록을 분리하여 출력 결과가 스크롤 없이 볼 수 있도록 구성했습니다.
 
 ### 명령행 도구로 사용
 
