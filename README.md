@@ -40,30 +40,31 @@ from pronunciation_mapper import PronunciationMapper
 
 # DB 정형데이터 용어 정의
 db_terms = [
-      'customer', 'product', 'transaction', 
-      'payment', 'shipping', 'invoice',
-      'ground',  'server',
-      '데이터베이스', '테이블', '필드',
-      '인덱스', '쿼리', 'svc66','log','account_no','ST주식회사','account_id' ,'서버', 'konlpy', 'XPN36'
-  ]
+    'customer', 'product', 'transaction', 
+    'payment', 'shipping', 'invoice',
+    'ground',  'server',
+    '데이터베이스', '테이블', '필드',
+    '인덱스', '쿼리', 'svc66','log','account_no','account_id' ,'서버', 'konlpy', 'XPN36', 'ST주식회사','KF주식회사','SF주식회사','SMTA','svc_accnt'
+]
 
 # 단어사전에서 사용자 정의 Custom Vocabulary 대응 매핑 추가
 custom_mappings = {
-    'svc66':'서비스66' ,          
+    # 한글 음성 출력-> DB인덱스 사전의 고유명사 매핑 (정확한 방향)
+    '서비스어카운트': 'svc_accnt',          
     '에스티주식회사':'ST주식회사',
-    'account_no':'어커운트넘버', 
-    'account_id':'어카운트아이디',
-    'account_id':'어카아이디',
-    'transaction': '트랜잭션',
-    'payment': '페이먼트',
-    'shipping': '쉬핑',
-    'invoice': '인보이스',
-    'ground': '그라운드',
-    'cloud': '클라우드',
-    'server': '서버',    
-    '어카운트':'어카운트',
-    'XPN36':'엑스피엔36',
-    'XPN36':'엑스피엔삼심육'
+    '어커운트넘버': 'account_no', 
+    '어카운트아이디': 'account_id',
+    '어카아이디 ': 'account_id',
+    '트랜잭션': 'transaction',
+    '페이먼트': 'payment',
+    '쉬핑': 'shipping',
+    '인보이스': 'invoice',
+    '그라운드': 'ground',
+    '클라우드': 'cloud',
+    '서버': 'server',    
+    '엑스피엔36': 'XPN36',
+    '엑스피엔삼심육': 'XPN36',
+    '케이에프주식회사':'KF주식회사'
 }
 
 # 매퍼 초기화
