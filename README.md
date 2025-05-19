@@ -49,7 +49,7 @@ db_terms = [
 
 # 단어사전에서 사용자 정의 Custom Vocabulary 대응 매핑 추가
 custom_mappings = {
-    # 한글 음성 출력-> DB인덱스 사전의 고유명사 매핑 (정확한 방향)
+    # 한글 음성 초기 출력-> DB인덱스 사전의 고유명사 매핑 (정확한 방향)
     '서비스어카운트': 'svc_accnt',          
     '에스티주식회사':'ST주식회사',
     '어커운트넘버': 'account_no', 
@@ -278,7 +278,7 @@ db_query = mapper.map_sentence(asr_result)
 
 ## 예제
 
-더 많은 예제는 [examples/](examples/) 디렉토리를 참조하세요.
+셈플 예제는 [tests/](tests/) 디렉토리를 참조하세요.
 
 ## 기여하기
 
@@ -305,4 +305,4 @@ db_query = mapper.map_sentence(asr_result)
 
 ## 연락처
 
-질문이나 피드백이 있으시면 [GitHub 이슈](https://github.com/yourusername/pronunciation-mapper/issues)를 통해 문의해주세요.
+질문이나 피드백이 있으시면 [GitHub 이슈](https://github.com/hyeonsangjeon/pronunciation-mapper/issues)를 통해 문의해주세요.
