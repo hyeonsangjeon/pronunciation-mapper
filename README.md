@@ -180,7 +180,7 @@ db_query = mapper.map_sentence(asr_result)
 
 - **DB_TERMS**는 **전화번호부**와 같습니다:
   - 실제로 존재하는 사람/회사의 목록
-  - 이 목록에 있는 용어만 찾을 수 있음
+  - 이 인덱스 목록에 있는 용어는 정형데이터의 고유 명사들이며, STT의 출력을 치환하는 값들임
 
 - **CUSTOM_MAPPINGS**는 **번역사전**과 같습니다:
   - "이 단어는 저 단어로 번역해라"라는 규칙 
@@ -199,8 +199,11 @@ db_query = mapper.map_sentence(asr_result)
 2. **CUSTOM_MAPPINGS** (변환 규칙):
    ```python
    custom_mappings = {
-     "고객": "customer",    # 입력 → 출력
+     "고객": "customer",
+     "커스터머": "customer",
+     "커스타마": "customer",
      "제품": "product",
+     "프로덕트": "product",
      "서버": "server"
    }
    ```

@@ -27,11 +27,11 @@ ENG_TO_KOR_SOUNDS = {
 
 # 데이터베이스 용어 전사 매핑 (프로젝트에서 사용하는 DB 고유명사 중 특정 용어로 표현되는경우 직접 매핑)
 # 1:N
-# 원하는 출력 : STT예상출력
+#  STT초기출력 :원하는 출력 
 DB_TERM_MAPPINGS = {
-    'customer': '커스터머',
-    'customer': '커스타마',
-    'product': '프로덕트',
+    '커스터머':'customer',
+    '커스타마':'customer',
+    '프로덕트':'product'
 #...추가하세요. 
 }
 

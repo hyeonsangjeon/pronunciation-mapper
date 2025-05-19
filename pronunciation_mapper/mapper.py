@@ -17,17 +17,20 @@ class PronunciationMapper:
         self.eng_to_kor_sounds = ENG_TO_KOR_SOUNDS.copy()
         self.term_mappings = DB_TERM_MAPPINGS.copy()
         
-        # 사용자 정의 매핑 추가
+        # 사용자 정의 매핑 처리
         if custom_mappings:
-            self.term_mappings.update(custom_mappings)
+            # 매핑 방향 유지 (한글->영어 또는 영어->한글)
+            for source, target in custom_mappings.items():
+                # 기존 매핑에 추가
+                self.term_mappings[source] = target
+                
+                # target이 DB 용어 목록에 있는 경우 역방향 매핑도 추가
+                if target in self.db_terms and source not in self.term_mappings:
+                    # 중복되지 않게 역방향 추가
+                    self.term_mappings[target] = source
         
-        # DB 용어에 있는 모든 단어에 대해 역방향 매핑도 추가
-        for term in db_terms:
-            if term in self.term_mappings:
-                kor_term = self.term_mappings[term]
-                # 영-한 매핑이 이미 있으면 한-영 매핑 추가
-                if kor_term and kor_term not in self.term_mappings:
-                    self.term_mappings[kor_term] = term
+        # DB 용어에 있는 모든 단어에 대한 역방향 매핑 구성
+        self._build_bidirectional_mappings()
         
         # 발음 규칙
         self.pronunciation_rules = PRONUNCIATION_RULES['korean']
@@ -37,6 +40,36 @@ class PronunciationMapper:
         for term in db_terms:
             self.db_term_pronunciations[term] = self._get_normalized_pronunciation(term)
     
+
+    def _build_bidirectional_mappings(self):
+        """양방향 매핑을 구성합니다"""
+        # 한글-영어 매핑을 기반으로 역방향 매핑 구성
+        kor_to_eng_mappings = {}
+        eng_to_kor_mappings = {}
+        
+        # 기존 매핑 분류
+        for source, target in self.term_mappings.items():
+            # 한글 -> 영어 매핑인 경우
+            if (any('\uAC00' <= c <= '\uD7A3' for c in source) and 
+                target in self.db_terms and 
+                not any('\uAC00' <= c <= '\uD7A3' for c in target)):
+                kor_to_eng_mappings[source] = target
+            # 영어 -> 한글 매핑인 경우
+            elif (source in self.db_terms and 
+                any('\uAC00' <= c <= '\uD7A3' for c in target) and 
+                not any('\uAC00' <= c <= '\uD7A3' for c in source)):
+                eng_to_kor_mappings[source] = target
+        
+        # 누락된 역방향 매핑 추가
+        for kor, eng in kor_to_eng_mappings.items():
+            if eng not in self.term_mappings:
+                self.term_mappings[eng] = kor
+        
+        for eng, kor in eng_to_kor_mappings.items():
+            if kor not in self.term_mappings:
+                self.term_mappings[kor] = eng
+
+
     def _get_normalized_pronunciation(self, word):
         """단어를 정규화된 발음으로 변환"""
         # 직접 매핑이 있는 경우 매핑된 발음 사용
