@@ -46,10 +46,10 @@ print(f"매핑 결과: {result}, 점수: {score}")
 # 출력: 매핑 결과: customer, 점수: 0.0
 
 # 문장 매핑
-sentence = "그라운드에 있는 데이타베이스의 커스터머 정보를 확인해주세요"
+sentence = "그라운드에 있는 엑스피엔36 데이타배이스 써버의 트랜텍숑 로그를 확인해주세요. 서비스육십육 상품에서 삼백이십일번 트랜젝션 로그 찾아줘 어카운트넘버 사삼삼오삼칠 천국의계단. 나는 에스티주식회사 천만백부장이고 어카아이디는 아니아니 어카운트아이디는 공팔공팔팔이야"
 mapped = mapper.map_sentence(sentence)
 print(f"매핑된 문장: {mapped}")
-# 출력: 매핑된 문장: ground에 있는 데이터베이스의 customer 정보를 확인해주세요
+# 출력: 매핑된 문장: ground에 있는 XPN36 데이터베이스 server의 transaction 로그를 확인해주세요. 서비스육십육 상품에서 321번 transaction log 찾아줘 account_no 433537 천국의계단. 나는 ST주식회사 천만백부장이고 account_id는 아니아니 account_id는 080882야
 ```
 
 ### 명령행 도구로 사용
