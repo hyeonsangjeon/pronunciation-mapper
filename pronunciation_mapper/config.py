@@ -30,6 +30,7 @@ ENG_TO_KOR_SOUNDS = {
 # 원하는 출력 : STT예상출력
 DB_TERM_MAPPINGS = {
     'customer': '커스터머',
+    'customer': '커스타마',
     'product': '프로덕트',
 #...추가하세요. 
 }
