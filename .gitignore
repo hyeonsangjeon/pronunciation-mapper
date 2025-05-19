@@ -5,7 +5,7 @@ __pycache__/
 bedrock-python-sdk
 bedrock-python-sdk.zip
 verification
-
+.github/
 __pycache__/
 .venv
 .DS_Store
