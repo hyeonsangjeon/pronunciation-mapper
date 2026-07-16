@@ -1,6 +1,9 @@
 # Pronunciation Mapper V2 아키텍처
 
-기준일: 2026-07-16
+- 상태: Accepted
+- 최초 기준일: 2026-07-16
+- 최종 검토일: 2026-07-17
+- 구현 기준: `2.0.0` release candidate
 
 ## 1. 문제 재정의
 
@@ -239,12 +242,25 @@ async with AgenticPronunciationMapper(
 5. lexical search hit/precision까지 비교한 뒤 일부 traffic부터 적용합니다.
 6. mapping 자동 저장은 마지막 단계까지 두지 말고 human approval workflow를 별도로 설계합니다.
 
-## 8. 다음 단계
+## 8. 구현 상태
+
+2026-07-17 기준 다음 운영 기반까지 구현하고 검증했습니다.
+
+- Python 3.10–3.13 offline CI, golden eval release gate, wheel build
+- GitHub Pages JavaScript·DOM·local asset 검증
+- external-tenant Foundry live integration test(local Entra CLI session)
+- GitHub OIDC workflow와 `ci-` 임시 deployment cleanup guard 구현·정적 검증
+- 실제 Foundry 결과 수와 fallback rate를 분리한 release gate
+
+검증 수치와 미완료 release 작업은 [V2.0.0 릴리스 기록](releases/v2.0.0.md)에 보존합니다.
+GitHub-hosted OIDC end-to-end 실행은 repository Environment와 Entra federation 구성 후 완료할 운영 작업입니다.
+
+## 9. 다음 단계
 
 - 대규모 vocabulary용 BK-tree/ANN 후보 인덱스
 - 모호한 짧은 한글 숫자를 위한 별도 bounded numeric candidate/resolver
 - Ollama embedding을 의미 보조 신호로 추가하되 발음 후보와 분리
 - 승인 기반 feedback dataset과 mapping promotion workflow
-- Foundry/Ollama live integration test를 opt-in CI job으로 분리
+- Ollama live integration test를 opt-in CI job으로 분리
 - Application Insights/OpenTelemetry adapter
 - 다른 서비스가 요구할 때 Foundry hosted agent protocol adapter 추가

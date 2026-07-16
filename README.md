@@ -255,7 +255,11 @@ python evals/run_v2.py --provider ollama
 
 ## 문서
 
+- [문서와 기록 안내](docs/README.md)
+- [변경 기록](CHANGELOG.md)
+- [V2.0.0 릴리스 기록](docs/releases/v2.0.0.md)
 - [V2 아키텍처와 마이그레이션](docs/V2_ARCHITECTURE.md)
+- [아키텍처 결정 기록](docs/decisions/README.md)
 - [GitHub Actions와 외부 tenant Foundry OIDC 설정](docs/CI_SETUP.md)
 - [V2 eval dataset](evals/cases.jsonl)
 - [환경 변수 예시](.env.example)

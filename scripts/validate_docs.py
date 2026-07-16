@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from collections import Counter
 from html.parser import HTMLParser
@@ -15,6 +16,8 @@ DOCS_DIR = ROOT / "docs"
 INDEX_PATH = DOCS_DIR / "index.html"
 REQUIRED_IDS = {"main-content", "quickstart", "workflow", "providers", "usage", "operations"}
 REFERENCE_ATTRIBUTES = {"aria-controls", "aria-labelledby", "data-copy-target"}
+MARKDOWN_LINK_PATTERN = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+MARKDOWN_REFERENCE_PATTERN = re.compile(r"^\[[^\]]+\]:\s+(\S+)", re.MULTILINE)
 
 
 class DocumentParser(HTMLParser):
@@ -84,6 +87,38 @@ def validate() -> list[str]:
         elif not resolved.is_file():
             errors.append(f"local asset does not exist: {asset}")
 
+    errors.extend(validate_markdown_links())
+    return errors
+
+
+def validate_markdown_links() -> list[str]:
+    errors: list[str] = []
+    markdown_paths = [ROOT / "README.md", ROOT / "README-EN.md", ROOT / "CHANGELOG.md"]
+    markdown_paths.extend(sorted((ROOT / "docs").rglob("*.md")))
+
+    for markdown_path in markdown_paths:
+        text = markdown_path.read_text(encoding="utf-8")
+        targets = MARKDOWN_LINK_PATTERN.findall(text)
+        targets.extend(MARKDOWN_REFERENCE_PATTERN.findall(text))
+        for raw_target in targets:
+            target = raw_target.strip().strip("<>")
+            parsed = urlsplit(target)
+            if parsed.scheme or parsed.netloc or not parsed.path:
+                continue
+            if parsed.path.startswith("/"):
+                errors.append(
+                    f"root-absolute Markdown link is not portable: {markdown_path.relative_to(ROOT)} -> {target}"
+                )
+                continue
+            resolved = (markdown_path.parent / unquote(parsed.path)).resolve()
+            if ROOT.resolve() != resolved and ROOT.resolve() not in resolved.parents:
+                errors.append(
+                    f"Markdown link escapes repository: {markdown_path.relative_to(ROOT)} -> {target}"
+                )
+            elif not resolved.exists():
+                errors.append(
+                    f"Markdown link target does not exist: {markdown_path.relative_to(ROOT)} -> {target}"
+                )
     return errors
 
 
@@ -93,7 +128,7 @@ def main() -> int:
         for error in errors:
             print(f"docs validation failed: {error}", file=sys.stderr)
         return 1
-    print(f"docs validation passed: {INDEX_PATH}")
+    print(f"documentation validation passed: {INDEX_PATH}")
     return 0
 
 

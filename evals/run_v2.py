@@ -3,10 +3,15 @@
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
+import os
+import platform
 import statistics
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -14,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pronunciation_mapper import __version__
 from pronunciation_mapper.v2 import AgenticPronunciationMapper, ProviderUnavailableError
 
 
@@ -108,6 +114,88 @@ def validate_gate_args(args):
         raise SystemExit("--min-provider-results must be at least 0")
 
 
+def build_report_metadata(args, rows):
+    revision, revision_dirty = _git_state()
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "revision": revision,
+        "revision_dirty": revision_dirty,
+        "package_version": __version__,
+        "python_version": platform.python_version(),
+        "inputs": {
+            "cases": {
+                "path": _portable_path(args.cases),
+                "sha256": _sha256(args.cases),
+            },
+            "vocabulary": {
+                "path": _portable_path(args.vocabulary),
+                "sha256": _sha256(args.vocabulary),
+            },
+        },
+        "execution": {
+            "provider": args.provider,
+            "models": sorted({row["model"] for row in rows if row["model"]}),
+            "credential_mode": _credential_mode(args.provider),
+        },
+        "release_gate": {
+            "fail_under": args.fail_under,
+            "max_fallback_rate": args.max_fallback_rate,
+            "min_provider_results": args.min_provider_results,
+        },
+    }
+
+
+def _sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _portable_path(path):
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return path.name
+
+
+def _credential_mode(provider):
+    if provider == "offline":
+        return "none"
+    if provider == "ollama":
+        return "local-ollama"
+    configured = os.getenv("AZURE_TOKEN_CREDENTIALS")
+    allowed = {
+        "AzureCliCredential",
+        "DefaultAzureCredential",
+        "ManagedIdentityCredential",
+        "WorkloadIdentityCredential",
+    }
+    return configured if configured in allowed else "DefaultAzureCredential"
+
+
+def _git_state():
+    revision = os.getenv("EVAL_GIT_SHA") or os.getenv("GITHUB_SHA")
+    try:
+        if not revision:
+            revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return revision or None, None
+    return revision or None, dirty
+
+
 async def run(args):
     vocabulary = json.loads(args.vocabulary.read_text(encoding="utf-8"))
     cases = load_jsonl(args.cases)
@@ -163,7 +251,13 @@ async def run(args):
         "latency_p50_ms": round(statistics.median(latencies), 3) if latencies else 0.0,
         "latency_p95_ms": round(percentile(latencies, 0.95), 3),
     }
-    report = {"provider": args.provider, "metrics": metrics, "cases": rows}
+    report = {
+        "schema_version": 1,
+        "metadata": build_report_metadata(args, rows),
+        "provider": args.provider,
+        "metrics": metrics,
+        "cases": rows,
+    }
 
     output_path = args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)

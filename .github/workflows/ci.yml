@@ -73,6 +73,8 @@ jobs:
           python -m pip install -e '.[dev]'
 
       - name: Run deterministic release eval
+        env:
+          EVAL_GIT_SHA: ${{ github.sha }}
         run: >-
           python evals/run_v2.py
           --provider offline

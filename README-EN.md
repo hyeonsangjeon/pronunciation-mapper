@@ -65,4 +65,4 @@ Korean number normalization is intentionally conservative. Explicit units/counte
 
 The original `PronunciationMapper` class and CLI commands remain available and never require network credentials.
 
-See [the V2 architecture document](docs/V2_ARCHITECTURE.md), the [GitHub Actions and external-tenant Foundry OIDC setup](docs/CI_SETUP.md), and the full Korean [README](README.md).
+See the [documentation index](docs/README.md), [changelog](CHANGELOG.md), [V2 architecture document](docs/V2_ARCHITECTURE.md), [V2.0.0 release record](docs/releases/v2.0.0.md), the [GitHub Actions and external-tenant Foundry OIDC setup](docs/CI_SETUP.md), and the full Korean [README](README.md).
