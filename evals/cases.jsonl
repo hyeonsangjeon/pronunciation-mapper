@@ -1,0 +1,15 @@
+{"id":"exact-alias","input":"커스터머 조회","expected":"customer 조회","should_change":true}
+{"id":"particle-and-identifier","input":"엑스피엔36 서버에서 조회","expected":"XPN36 server에서 조회","should_change":true}
+{"id":"fuzzy-pronunciation","input":"트랜잭숑 로그","expected":"transaction log","should_change":true}
+{"id":"spoken-number","input":"어카운트넘버 사삼삼오삼칠 조회","expected":"account_no 433537 조회","should_change":true}
+{"id":"compound-alias","input":"클라우드서버 상태","expected":"cloud server 상태","should_change":true}
+{"id":"punctuation-spacing","input":"커스터머,  서버에서!","expected":"customer,  server에서!","should_change":true}
+{"id":"proper-noun-preserve","input":"천국의계단 조회","expected":"천국의계단 조회","should_change":false}
+{"id":"ordinary-text-preserve","input":"오늘 날씨 알려줘","expected":"오늘 날씨 알려줘","should_change":false}
+{"id":"partial-alias-preserve","input":"신규커스터머정보 조회","expected":"신규customer정보 조회","should_change":true}
+{"id":"identifier-suffix-preserve","input":"account_no_prod 조회","expected":"account_no_prod 조회","should_change":false}
+{"id":"number-idiom-preserve","input":"일일이 확인","expected":"일일이 확인","should_change":false}
+{"id":"large-number-counter","input":"일억 원","expected":"100000000 원","should_change":true}
+{"id":"punctuated-identifier-preserve","input":"customer-id schema.table 조회","expected":"customer-id schema.table 조회","should_change":false}
+{"id":"numeric-looking-ordinary-word","input":"android 사이사이 간격","expected":"android 사이사이 간격","should_change":false}
+{"id":"phone-number-context","input":"전화번호 공일공일이삼사오육칠팔이야","expected":"전화번호 01012345678이야","should_change":true}

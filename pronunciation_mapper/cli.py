@@ -6,6 +6,7 @@ import sys
 import json
 from .mapper import PronunciationMapper
 from .utils import load_mappings_from_file, save_mappings_to_file, get_cache_path
+from .v2 import AgenticPronunciationMapper
 
 def main():
     parser = argparse.ArgumentParser(description='발음 유사도 기반 매핑 도구')
@@ -24,6 +25,21 @@ def main():
     map_sentence_parser.add_argument('sentence', help='매핑할 문장')
     map_sentence_parser.add_argument('--db-terms', '-d', help='DB 용어 파일(.json)')
     map_sentence_parser.add_argument('--threshold', '-t', type=float, help='유사도 임계값')
+
+    # V2 agentic rewrite 명령
+    rewrite_parser = subparsers.add_parser('rewrite', aliases=['rewrite-v2'], help='V2 agentic Query Rewriting')
+    rewrite_parser.add_argument('sentence', help='매핑할 문장')
+    rewrite_parser.add_argument('--db-terms', '-d', help='DB 용어 파일(.json)')
+    rewrite_parser.add_argument('--threshold', '-t', type=float, help='fallback 유사도 임계값')
+    rewrite_parser.add_argument('--provider', choices=['azure', 'ollama'], default='azure', help='AI provider (기본: azure)')
+    rewrite_parser.add_argument('--model', help='Foundry deployment 또는 Ollama model 이름')
+    rewrite_parser.add_argument('--endpoint', help='Foundry project endpoint 또는 Ollama host')
+    rewrite_parser.add_argument(
+        '--fallback', choices=['heuristic', 'original', 'raise'], default='heuristic',
+        help='provider 실패 정책 (기본: heuristic)',
+    )
+    rewrite_parser.add_argument('--min-confidence', type=float, default=0.55, help='교체를 적용할 최소 모델 confidence')
+    rewrite_parser.add_argument('--json', action='store_true', help='상세 결과를 JSON으로 출력')
     
     # 매핑 추가 명령
     add_mapping_parser = subparsers.add_parser('add-mapping', help='사용자 정의 매핑 추가')
@@ -66,7 +82,7 @@ def main():
     custom_mappings = load_mappings_from_file(cache_path)
     
     # 매퍼 초기화
-    threshold = args.threshold if hasattr(args, 'threshold') and args.threshold else None
+    threshold = args.threshold if hasattr(args, 'threshold') and args.threshold is not None else None
     mapper = PronunciationMapper(db_terms, threshold=threshold, custom_mappings=custom_mappings)
     
     # 명령 실행
@@ -78,6 +94,35 @@ def main():
         result = mapper.map_sentence(args.sentence)
         print(f"원문: {args.sentence}")
         print(f"매핑: {result}")
+
+    elif args.command in {'rewrite', 'rewrite-v2'}:
+        provider_options = {}
+        if args.model:
+            provider_options['model'] = args.model
+        if args.endpoint:
+            provider_options['endpoint' if args.provider == 'azure' else 'host'] = args.endpoint
+        v2_mapper = AgenticPronunciationMapper(
+            db_terms,
+            custom_mappings=custom_mappings,
+            provider=args.provider,
+            provider_options=provider_options,
+            threshold=threshold,
+            minimum_confidence=args.min_confidence,
+            fallback_strategy=args.fallback,
+        )
+        try:
+            result = v2_mapper.rewrite_sync(args.sentence)
+        except Exception as error:
+            print(f"V2 rewrite 오류: {error}", file=sys.stderr)
+            return 1
+        finally:
+            v2_mapper.close()
+        if args.json:
+            print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(f"원문: {result.original_text}")
+            print(f"매핑: {result.rewritten_text}")
+            print(f"provider: {result.provider} (fallback={result.fallback_used})")
         
     elif args.command == 'add-mapping':
         mapper.add_custom_mapping(args.source, args.target)

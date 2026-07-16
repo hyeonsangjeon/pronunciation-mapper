@@ -1,0 +1,26 @@
+{
+  "terms": [
+    "customer",
+    "transaction",
+    "ground",
+    "cloud",
+    "server",
+    "데이터베이스",
+    "XPN36",
+    "account_no",
+    "log",
+    "customer-id",
+    "schema.table"
+  ],
+  "mappings": {
+    "커스터머": "customer",
+    "트랜잭션": "transaction",
+    "그라운드": "ground",
+    "클라우드": "cloud",
+    "서버": "server",
+    "데이타베이스": "데이터베이스",
+    "엑스피엔36": "XPN36",
+    "어카운트넘버": "account_no",
+    "로그": "log"
+  }
+}

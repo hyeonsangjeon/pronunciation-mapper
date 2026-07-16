@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Microsoft Foundry를 기본으로 사용하는 Pronunciation Mapper V2의 한국어 빠른 시작 및 운영 가이드">
+  <meta property="og:title" content="Pronunciation Mapper V2 사용 가이드">
+  <meta property="og:description" content="한국어 ASR 결과를 검색 가능한 DB 용어로 안전하게 정규화하세요.">
+  <meta property="og:type" content="website">
+  <title>Pronunciation Mapper V2 — 사용 가이드</title>
+  <link rel="stylesheet" href="./styles.css?v=2">
+  <script>document.documentElement.classList.add('js');</script>
+  <script src="./script.js?v=2" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
+
+  <header class="site-header" data-header>
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="Pronunciation Mapper V2 홈">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+          <path d="M4 19h4l2.5-8 4 17 4-23 4.5 26 3.5-17 2.5 5h3" />
+        </svg>
+        <span>Pronunciation Mapper <strong>V2</strong></span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="메뉴 열기">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="주요 메뉴">
+        <a href="#quickstart">빠른 시작</a>
+        <a href="#workflow">작동 방식</a>
+        <a href="#providers">Provider</a>
+        <a href="#usage">API · CLI</a>
+        <a href="#operations">운영</a>
+        <a class="nav-github-mobile" href="https://github.com/hyeonsangjeon/pronunciation-mapper" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+
+      <a class="header-github" href="https://github.com/hyeonsangjeon/pronunciation-mapper" target="_blank" rel="noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.88c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.82a9.5 9.5 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.77c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/>
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero section-anchor" id="top">
+      <div class="container hero-grid">
+        <div class="hero-copy reveal">
+          <div class="eyebrow">
+            <span class="status-dot"></span>
+            Azure AI Foundry 기본 · Ollama 옵션
+          </div>
+          <h1>한국어 ASR를<br><span>검색 가능한 용어</span>로</h1>
+          <p class="hero-description">
+            발음이 비슷한 로컬 후보를 먼저 만들고, Microsoft Foundry가 문맥에 맞는 후보 ID만 고릅니다.
+            자유 생성 대신 제한된 선택과 로컬 검증으로 검색 질의를 안전하게 정규화합니다.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#quickstart">
+              5분 안에 시작하기
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg>
+            </a>
+            <a class="button button-secondary" href="https://github.com/hyeonsangjeon/pronunciation-mapper" target="_blank" rel="noreferrer">
+              GitHub에서 보기
+            </a>
+          </div>
+          <ul class="hero-facts" aria-label="핵심 특징">
+            <li><span>✓</span> DB vocabulary 밖 생성 차단</li>
+            <li><span>✓</span> V1 API 호환</li>
+            <li><span>✓</span> OpenAI API key 불필요</li>
+          </ul>
+        </div>
+
+        <div class="terminal-card reveal" aria-label="빠른 설치 명령">
+          <div class="terminal-bar">
+            <div class="terminal-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span>quick-start.sh</span>
+            <button class="copy-button copy-button-dark" type="button" data-copy-target="hero-install-code" aria-label="설치 명령 복사">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+              <span>복사</span>
+            </button>
+          </div>
+          <pre id="hero-install-code"><code><span class="code-comment"># 1. 저장소와 Foundry extra 설치</span>
+<span class="code-prompt">$</span> git clone https://github.com/hyeonsangjeon/pronunciation-mapper.git
+<span class="code-prompt">$</span> cd pronunciation-mapper
+<span class="code-prompt">$</span> pip install -e <span class="code-string">'.[foundry]'</span>
+
+<span class="code-comment"># 2. Microsoft Entra ID 로그인</span>
+<span class="code-prompt">$</span> az login
+<span class="code-comment"># 외부 tenant라면: az login --tenant '&lt;tenant-id&gt;'</span></code></pre>
+          <div class="terminal-output">
+            <span class="terminal-check">✓</span>
+            <span>Python 3.10+ · Foundry Project Responses API</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft section-anchor" id="quickstart">
+      <div class="container">
+        <div class="section-heading reveal">
+          <span class="section-kicker">Quick start</span>
+          <h2>Foundry 연결까지 세 단계</h2>
+          <p>기본 provider는 <code>azure</code>입니다. 배포 이름과 프로젝트 endpoint만 설정하면 됩니다.</p>
+        </div>
+
+        <div class="quickstart-layout">
+          <ol class="step-list reveal">
+            <li>
+              <span class="step-number">1</span>
+              <div>
+                <h3>패키지 설치</h3>
+                <p>Azure SDK가 포함된 <code>foundry</code> extra를 설치합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div>
+                <h3>Entra ID 인증</h3>
+                <p>로컬은 <code>az login</code>, 외부 tenant는 <code>az login --tenant '&lt;tenant-id&gt;'</code>를 사용합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div>
+                <h3>프로젝트와 배포 지정</h3>
+                <p><code>FOUNDRY_MODEL</code>에는 catalog ID가 아닌 실제 배포 이름을 넣습니다.</p>
+              </div>
+            </li>
+          </ol>
+
+          <div class="setup-stack reveal">
+            <article class="code-card">
+              <div class="code-card-header">
+                <div>
+                  <span class="code-card-label">환경 변수</span>
+                  <strong>.env 또는 shell</strong>
+                </div>
+                <button class="copy-button" type="button" data-copy-target="env-code" aria-label="환경 변수 복사">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+                  <span>복사</span>
+                </button>
+              </div>
+              <pre id="env-code"><code><span class="code-keyword">export</span> FOUNDRY_PROJECT_ENDPOINT=<span class="code-string">'https://&lt;account&gt;.services.ai.azure.com/api/projects/&lt;project&gt;'</span>
+<span class="code-keyword">export</span> FOUNDRY_MODEL=<span class="code-string">'&lt;deployment-name&gt;'</span></code></pre>
+            </article>
+            <div class="info-callout">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+              <div>
+                <p><strong>API key는 필요 없습니다.</strong> <code>DefaultAzureCredential</code>이 로컬의 Azure CLI 세션 또는 운영 환경의 Managed Identity를 사용합니다.</p>
+                <p class="info-callout-secondary"><code>.env.example</code>은 자동으로 로드되지 않습니다. shell에서 export하거나 애플리케이션에서 dotenv를 로드하세요.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-anchor" id="workflow">
+      <div class="container">
+        <div class="section-heading section-heading-centered reveal">
+          <span class="section-kicker">Bounded decision agent</span>
+          <h2>모델의 권한을 줄인 하이브리드 흐름</h2>
+          <p>발음 후보 생성과 최종 검증은 로컬에서, 애매한 문맥 판단만 모델에서 수행합니다.</p>
+        </div>
+
+        <div class="workflow reveal" aria-label="처리 흐름">
+          <article class="workflow-step">
+            <span class="workflow-index">01</span>
+            <span class="workflow-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg>
+            </span>
+            <h3>ASR 입력</h3>
+            <p>원문과 숫자를 보수적으로 정규화</p>
+          </article>
+          <span class="workflow-arrow" aria-hidden="true">→</span>
+          <article class="workflow-step">
+            <span class="workflow-index">02</span>
+            <span class="workflow-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h5"/><circle cx="17" cy="15" r="4"/><path d="m20 18 2 2"/></svg>
+            </span>
+            <h3>로컬 Top-K</h3>
+            <p>exact alias와 발음 거리로 후보 축소</p>
+          </article>
+          <span class="workflow-arrow" aria-hidden="true">→</span>
+          <article class="workflow-step workflow-step-accent">
+            <span class="workflow-index">03</span>
+            <span class="workflow-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a5 5 0 0 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 19 18H7Z"/><path d="m10 13 2 2 4-4"/></svg>
+            </span>
+            <h3>Foundry 판정</h3>
+            <p>문맥상 후보 ID를 선택하거나 거부</p>
+          </article>
+          <span class="workflow-arrow" aria-hidden="true">→</span>
+          <article class="workflow-step">
+            <span class="workflow-index">04</span>
+            <span class="workflow-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+            </span>
+            <h3>로컬 검증</h3>
+            <p>스키마·span·ID·vocabulary 재검사</p>
+          </article>
+          <span class="workflow-arrow" aria-hidden="true">→</span>
+          <article class="workflow-step">
+            <span class="workflow-index">05</span>
+            <span class="workflow-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5"/></svg>
+            </span>
+            <h3>검색 질의</h3>
+            <p>공백과 조사를 보존한 canonical term</p>
+          </article>
+        </div>
+
+        <div class="guardrail reveal">
+          <div class="guardrail-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+          </div>
+          <div>
+            <strong>핵심 가드레일</strong>
+            <p>모델은 replacement 문자열을 만들지 않습니다. 제공된 candidate ID에 대해 <code>replace</code>, <code>keep</code>, <code>abstain</code> 중 하나만 반환합니다.</p>
+          </div>
+          <span class="guardrail-badge">Local validation</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft section-anchor" id="providers">
+      <div class="container">
+        <div class="section-heading reveal">
+          <span class="section-kicker">Provider policy</span>
+          <h2>Foundry가 기본, Ollama는 명시적 옵션</h2>
+          <p>환경 사이의 데이터 경계를 지키기 위해 Azure 장애 시 Ollama로 자동 전환하지 않습니다.</p>
+        </div>
+
+        <div class="provider-grid">
+          <article class="provider-card provider-primary reveal">
+            <div class="provider-top">
+              <div class="provider-logo azure-logo" aria-hidden="true">A</div>
+              <div>
+                <div class="provider-title-row">
+                  <h3>Microsoft Foundry</h3>
+                  <span class="badge badge-blue">기본</span>
+                </div>
+                <p>Project-scoped Responses API</p>
+              </div>
+            </div>
+            <ul class="check-list">
+              <li>Microsoft Entra ID와 Managed Identity</li>
+              <li>Structured Output 기반 제한된 판정</li>
+              <li>프로젝트 단위 모델·관측·거버넌스</li>
+              <li><code>OPENAI_API_KEY</code> 불필요</li>
+            </ul>
+            <div class="provider-command">
+              <code>provider="azure"</code>
+              <span>생략 시 기본값</span>
+            </div>
+          </article>
+
+          <article class="provider-card reveal">
+            <div class="provider-top">
+              <div class="provider-logo ollama-logo" aria-hidden="true">
+                <svg viewBox="0 0 32 32"><path d="M10 10V6l2-3 2 3v3M18 10V6l2-3 2 3v5M8 11c-2 2-3 5-3 8 0 7 5 10 11 10s11-3 11-10c0-4-2-7-5-9H10Z"/><circle cx="13" cy="17" r="1"/><circle cx="20" cy="17" r="1"/></svg>
+              </div>
+              <div>
+                <div class="provider-title-row">
+                  <h3>Ollama</h3>
+                  <span class="badge badge-mint">옵션</span>
+                </div>
+                <p>로컬 native API</p>
+              </div>
+            </div>
+            <ul class="check-list">
+              <li><code>pip install -e '.[ollama]'</code></li>
+              <li><code>ollama pull qwen3.5:4b</code></li>
+              <li>모델별 한국어·JSON 품질 eval 필수</li>
+              <li>모델 자동 pull 및 자동 failover 없음</li>
+            </ul>
+            <div class="provider-command">
+              <code>provider="ollama"</code>
+              <span>반드시 명시</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="reference-note reveal">
+          <span class="reference-icon">i</span>
+          <p><strong>OpenAI · Claude는 reference-only입니다.</strong> V2 adapter와 API key 요구사항이 없으며, 선택하면 다른 provider로 조용히 전환하지 않고 명시적 오류를 반환합니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-anchor" id="usage">
+      <div class="container">
+        <div class="section-heading reveal">
+          <span class="section-kicker">API & CLI</span>
+          <h2>애플리케이션에 연결하기</h2>
+          <p>비동기 Python API가 기본이며, 운영 확인과 배치 테스트에는 같은 엔진을 사용하는 CLI를 쓸 수 있습니다.</p>
+        </div>
+
+        <div class="usage-grid">
+          <div class="code-workbench reveal">
+            <div class="tab-list" role="tablist" aria-label="사용 예시">
+              <button id="tab-python" role="tab" aria-selected="true" aria-controls="panel-python" tabindex="0">Python</button>
+              <button id="tab-cli" role="tab" aria-selected="false" aria-controls="panel-cli" tabindex="-1">CLI</button>
+              <button class="copy-button tab-copy" type="button" data-copy-active-panel aria-label="현재 코드 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+                <span>복사</span>
+              </button>
+            </div>
+
+            <div id="panel-python" class="tab-panel" role="tabpanel" aria-labelledby="tab-python">
+              <pre><code><span class="code-keyword">import</span> asyncio
+<span class="code-keyword">from</span> pronunciation_mapper <span class="code-keyword">import</span> AgenticPronunciationMapper
+
+<span class="code-keyword">async def</span> <span class="code-function">main</span>():
+    <span class="code-keyword">async with</span> AgenticPronunciationMapper(
+        [<span class="code-string">"XPN36"</span>, <span class="code-string">"account_no"</span>, <span class="code-string">"transaction"</span>, <span class="code-string">"server"</span>, <span class="code-string">"log"</span>],
+        custom_mappings={
+            <span class="code-string">"엑스피엔36"</span>: <span class="code-string">"XPN36"</span>,
+            <span class="code-string">"어카운트넘버"</span>: <span class="code-string">"account_no"</span>,
+            <span class="code-string">"서버"</span>: <span class="code-string">"server"</span>,
+            <span class="code-string">"로그"</span>: <span class="code-string">"log"</span>,
+        },
+    ) <span class="code-keyword">as</span> mapper:
+        result = <span class="code-keyword">await</span> mapper.rewrite(
+            <span class="code-string">"엑스피엔36 서버에서 트랜잭숑 로그"</span>
+        )
+        <span class="code-function">print</span>(result.rewritten_text)
+
+asyncio.run(main())</code></pre>
+            </div>
+
+            <div id="panel-cli" class="tab-panel" role="tabpanel" aria-labelledby="tab-cli" hidden>
+              <pre><code>pronunciation-mapper rewrite \
+  <span class="code-string">'엑스피엔36 서버에서 트랜잭숑 로그'</span> \
+  --db-terms examples/db_terms.json \
+  --provider azure \
+  --json
+
+<span class="code-comment"># Ollama는 provider와 model을 명시합니다.</span>
+pronunciation-mapper rewrite <span class="code-string">'트랜잭숑 로그'</span> \
+  --provider ollama \
+  --model qwen3.5:4b</code></pre>
+            </div>
+          </div>
+
+          <article class="result-card reveal">
+            <div class="result-card-header">
+              <div>
+                <span class="result-status"><i></i> RewriteResult</span>
+                <h3>문자열과 판단 trace를 함께 반환</h3>
+              </div>
+              <button class="copy-button" type="button" data-copy-target="result-code" aria-label="결과 JSON 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+                <span>복사</span>
+              </button>
+            </div>
+            <pre id="result-code"><code>{
+  <span class="code-json-key">"rewritten_text"</span>: <span class="code-string">"XPN36 server에서 transaction log"</span>,
+  <span class="code-json-key">"provider"</span>: <span class="code-string">"azure-foundry"</span>,
+  <span class="code-json-key">"model"</span>: <span class="code-string">"&lt;deployment-name&gt;"</span>,
+  <span class="code-json-key">"fallback_used"</span>: <span class="code-keyword">false</span>,
+  <span class="code-json-key">"decisions"</span>: [
+    {
+      <span class="code-json-key">"source"</span>: <span class="code-string">"트랜잭숑"</span>,
+      <span class="code-json-key">"replacement"</span>: <span class="code-string">"transaction"</span>,
+      <span class="code-json-key">"action"</span>: <span class="code-string">"replace"</span>,
+      <span class="code-json-key">"confidence"</span>: <span class="code-number">0.91</span>
+    }
+  ]
+}</code></pre>
+            <div class="result-fields" aria-label="주요 결과 필드">
+              <span>latency_ms</span>
+              <span>usage</span>
+              <span>diagnostics</span>
+              <span>distance</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="fallback-strip reveal">
+          <div>
+            <span class="fallback-label">provider 실패 정책</span>
+            <strong>fallback_strategy</strong>
+          </div>
+          <div class="fallback-options">
+            <span><code>"heuristic"</code><small>기본 · V1 후보 적용</small></span>
+            <span><code>"original"</code><small>원문/숫자 정규화 유지</small></span>
+            <span><code>"raise"</code><small>오류를 호출자에게 전파</small></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft section-anchor" id="operations">
+      <div class="container operations-grid">
+        <div>
+          <div class="section-heading reveal">
+            <span class="section-kicker">Production checklist</span>
+            <h2>운영 전 확인할 것</h2>
+            <p>정확도뿐 아니라 잘못 바꾸는 비율과 provider 장애 시 동작을 함께 측정하세요.</p>
+          </div>
+          <ul class="operations-list reveal">
+            <li>
+              <span class="operation-check">✓</span>
+              <div><strong>인증과 권한</strong><p>운영에서는 Managed Identity와 최소 RBAC를 사용합니다.</p></div>
+            </li>
+            <li>
+              <span class="operation-check">✓</span>
+              <div><strong>Golden set 평가</strong><p>exact accuracy, false rewrite, abstention, p95 latency를 release gate로 둡니다.</p></div>
+            </li>
+            <li>
+              <span class="operation-check">✓</span>
+              <div><strong>민감 정보 로그</strong><p>원문·prompt·전체 vocabulary의 content logging은 기본적으로 끕니다.</p></div>
+            </li>
+            <li>
+              <span class="operation-check">✓</span>
+              <div><strong>입력 상한</strong><p>기본 4,096자·64 span·token 256자를 넘기면 잘라 보내지 않고 거부합니다.</p></div>
+            </li>
+          </ul>
+        </div>
+
+        <aside class="eval-card reveal" aria-labelledby="eval-title">
+          <div class="eval-card-top">
+            <span class="eval-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8M9 3v5l-5 9a3 3 0 0 0 2.6 4.5h10.8A3 3 0 0 0 20 17l-5-9V3"/><path d="M7 15h10"/></svg>
+            </span>
+            <div>
+              <span class="section-kicker">Evaluation</span>
+              <h3 id="eval-title">배포 전 같은 데이터로 비교</h3>
+            </div>
+          </div>
+          <p>외부 연결 없는 baseline부터 실제 provider까지 순서대로 실행합니다.</p>
+          <div class="eval-commands">
+            <div>
+              <code id="test-command">python -m pytest -q</code>
+              <button class="copy-icon-button" type="button" data-copy-target="test-command" aria-label="테스트 명령 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+              </button>
+            </div>
+            <div>
+              <code id="offline-command">python evals/run_v2.py --provider offline</code>
+              <button class="copy-icon-button" type="button" data-copy-target="offline-command" aria-label="오프라인 평가 명령 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+              </button>
+            </div>
+            <div>
+              <code id="azure-command">python evals/run_v2.py --provider azure</code>
+              <button class="copy-icon-button" type="button" data-copy-target="azure-command" aria-label="Foundry 평가 명령 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+              </button>
+            </div>
+            <div>
+              <code id="ollama-command">python evals/run_v2.py --provider ollama</code>
+              <button class="copy-icon-button" type="button" data-copy-target="ollama-command" aria-label="Ollama 평가 명령 복사">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6" y="6" width="10" height="10" rx="2"/><path d="M4 13H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></svg>
+              </button>
+            </div>
+          </div>
+          <a class="text-link" href="https://github.com/hyeonsangjeon/pronunciation-mapper" target="_blank" rel="noreferrer">
+            전체 README와 소스 보기
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg>
+          </a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="closing">
+      <div class="container closing-inner reveal">
+        <div>
+          <span class="section-kicker">Ready to rewrite?</span>
+          <h2>검색 정확도는 높이고,<br>모델의 자유도는 낮추세요.</h2>
+        </div>
+        <a class="button button-light" href="#quickstart">빠른 시작으로 돌아가기</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a class="brand footer-brand" href="#top">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+          <path d="M4 19h4l2.5-8 4 17 4-23 4.5 26 3.5-17 2.5 5h3" />
+        </svg>
+        <span>Pronunciation Mapper <strong>V2</strong></span>
+      </a>
+      <nav aria-label="하단 메뉴">
+        <a href="#quickstart">시작</a>
+        <a href="#workflow">구조</a>
+        <a href="#usage">API</a>
+        <a href="#operations">운영</a>
+        <a href="https://github.com/hyeonsangjeon/pronunciation-mapper" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <p>MIT License · <span data-current-year>2026</span></p>
+    </div>
+  </footer>
+
+  <div class="sr-only" id="copy-status" aria-live="polite"></div>
+</body>
+</html>

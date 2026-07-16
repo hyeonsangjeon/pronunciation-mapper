@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pronunciation-mapper"
+version = "2.0.0"
+description = "Bounded agentic Korean ASR query rewriting with Microsoft Foundry and Ollama"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Hyeonsang Jeon"}]
+keywords = ["ASR", "query-rewriting", "Korean", "Microsoft-Foundry", "Ollama"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "jamo>=0.4.1,<0.5",
+]
+
+[project.optional-dependencies]
+foundry = [
+  "azure-ai-projects>=2.3,<3",
+  "azure-identity>=1.25,<2",
+  "openai>=2.8,<3",
+]
+ollama = [
+  "ollama>=0.5.3,<1",
+]
+dev = [
+  "pytest>=8,<10",
+  "pytest-asyncio>=0.24,<2",
+]
+
+[project.scripts]
+pronunciation-mapper = "pronunciation_mapper.cli:main"
+
+[project.urls]
+Repository = "https://github.com/hyeonsangjeon/pronunciation-mapper"
+
+[tool.setuptools.packages.find]
+include = ["pronunciation_mapper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "integration: requires a configured live Microsoft Foundry or Ollama provider",
+]
