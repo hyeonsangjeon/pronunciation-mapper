@@ -1,0 +1,154 @@
+name: Foundry live integration
+
+run-name: Foundry live integration${{ inputs.deployment && format(' ({0})', inputs.deployment) || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment:
+        description: Optional deployment override; leave blank to use FOUNDRY_MODEL
+        required: false
+        type: string
+        default: ""
+      cleanup_temporary_deployment:
+        description: Delete the tested deployment afterward (only names beginning with ci-)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundry-live-external-tenant
+  cancel-in-progress: false
+
+jobs:
+  foundry-live:
+    name: External tenant / Foundry
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: foundry-external
+    env:
+      OIDC_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      OIDC_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      OIDC_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+      REQUESTED_DEPLOYMENT: ${{ inputs.deployment }}
+      FOUNDRY_MODEL: ${{ inputs.deployment || vars.FOUNDRY_MODEL }}
+      FOUNDRY_RESOURCE_GROUP: ${{ vars.FOUNDRY_RESOURCE_GROUP }}
+      FOUNDRY_ACCOUNT_NAME: ${{ vars.FOUNDRY_ACCOUNT_NAME }}
+      AZURE_TOKEN_CREDENTIALS: AzureCliCredential
+      RUN_FOUNDRY_LIVE_TESTS: "1"
+      CLEANUP_TEMPORARY_DEPLOYMENT: ${{ inputs.cleanup_temporary_deployment }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate live-test configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in OIDC_CLIENT_ID OIDC_TENANT_ID OIDC_SUBSCRIPTION_ID FOUNDRY_PROJECT_ENDPOINT FOUNDRY_MODEL; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error title=Missing Foundry configuration::$name is not configured in the foundry-external environment"
+              missing=$((missing + 1))
+            fi
+          done
+          if (( missing > 0 )); then
+            exit 1
+          fi
+
+          if [[ "$CLEANUP_TEMPORARY_DEPLOYMENT" == "true" ]]; then
+            if [[ -z "$REQUESTED_DEPLOYMENT" ]]; then
+              echo "::error title=Unsafe cleanup refused::provide the temporary deployment explicitly when cleanup is enabled"
+              exit 1
+            fi
+            if [[ "$FOUNDRY_MODEL" != "$REQUESTED_DEPLOYMENT" ]]; then
+              echo "::error title=Unsafe cleanup refused::the tested and requested deployment names differ"
+              exit 1
+            fi
+            for name in FOUNDRY_RESOURCE_GROUP FOUNDRY_ACCOUNT_NAME; do
+              if [[ -z "${!name:-}" ]]; then
+                echo "::error title=Missing cleanup configuration::$name is required for temporary deployment cleanup"
+                missing=$((missing + 1))
+              fi
+            done
+            if [[ "$FOUNDRY_MODEL" != ci-* ]]; then
+              echo "::error title=Unsafe cleanup refused::cleanup is limited to deployment names beginning with ci-"
+              exit 1
+            fi
+          fi
+          if (( missing > 0 )); then
+            exit 1
+          fi
+
+      - name: Sign in to external Azure tenant with OIDC
+        id: azure_login
+        uses: Azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          audience: api://AzureADTokenExchange
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Foundry test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[foundry,dev]'
+
+      - name: Run focused Foundry integration test
+        run: python -m pytest -q -m integration tests/test_foundry_live.py
+
+      - name: Run Foundry golden-set eval
+        run: >-
+          python evals/run_v2.py
+          --provider azure
+          --fail-under 1.0
+          --max-fallback-rate 0.0
+          --min-provider-results 1
+          --output evals/results/foundry-live.json
+
+      - name: Upload Foundry eval report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: foundry-live-eval-${{ github.run_id }}
+          path: evals/results/foundry-live.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Delete tested temporary deployment
+        if: ${{ always() && inputs.cleanup_temporary_deployment == true && steps.azure_login.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$REQUESTED_DEPLOYMENT" || "$FOUNDRY_MODEL" != "$REQUESTED_DEPLOYMENT" || "$REQUESTED_DEPLOYMENT" != ci-* ]]; then
+            echo "::error title=Unsafe cleanup refused::deployment name must begin with ci-"
+            exit 1
+          fi
+          az cognitiveservices account deployment show \
+            --resource-group "$FOUNDRY_RESOURCE_GROUP" \
+            --name "$FOUNDRY_ACCOUNT_NAME" \
+            --deployment-name "$REQUESTED_DEPLOYMENT" \
+            --only-show-errors \
+            --output none
+          az cognitiveservices account deployment delete \
+            --resource-group "$FOUNDRY_RESOURCE_GROUP" \
+            --name "$FOUNDRY_ACCOUNT_NAME" \
+            --deployment-name "$REQUESTED_DEPLOYMENT" \
+            --only-show-errors \
+            --output none
