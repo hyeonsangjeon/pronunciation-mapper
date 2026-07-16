@@ -87,7 +87,7 @@ class TestAdvancedFeatures(unittest.TestCase):
                         "관대한 임계값에서 유사 단어가 매핑되지 않음")
         
         # 엄격한 임계값
-        mapped_strict, score_strict = self.mapper.find_closest_term(query, threshold=0.1)
+        mapped_strict, score_strict = self.mapper.find_closest_term(query, threshold=0.05)
         self.assertEqual(mapped_strict, query, 
                         "엄격한 임계값에서 다른 단어로 매핑됨")
     
@@ -97,11 +97,29 @@ class TestAdvancedFeatures(unittest.TestCase):
         query = "클라우드서버"
         expected = "cloud server"  # 이상적으로는 복합어를 인식하고 분리해야 함
         
-        # 이 테스트는 현재 구현에서 실패할 수 있음 (향후 개선 대상)
         mapped, score = self.mapper.find_closest_term(query)
-        # 현재 구현에서는 가장 유사한 단어로 매핑됨 (cloud 또는 server)
-        self.assertIn(mapped, ["cloud", "server"], 
-                     f"복합 단어가 적절하게 매핑되지 않음: {query} → {mapped}")
+        self.assertEqual(mapped, expected,
+                         f"복합 단어가 적절하게 매핑되지 않음: {query} → {mapped}")
+
+    def test_partial_alias_preserves_surrounding_text(self):
+        mapped, _ = self.mapper.find_closest_term("신규고객정보")
+        self.assertEqual(mapped, "신규customer정보")
+
+    def test_punctuated_canonical_identifier_is_not_split_and_duplicated(self):
+        mapper = PronunciationMapper(["customer-id", "schema.table", "api/v1"])
+        value = "customer-id schema.table api/v1"
+        self.assertEqual(mapper.map_sentence(value), value)
+
+    def test_canonical_and_alias_compound_are_both_preserved(self):
+        mapper = PronunciationMapper(
+            ["cloud", "server"], custom_mappings={"서버": "server"}
+        )
+        self.assertEqual(mapper.map_sentence("cloud서버"), "cloud server")
+        self.assertEqual(mapper.map_sentence("서버cloud"), "server cloud")
+
+    def test_canonical_term_never_rewrites_back_to_an_alias(self):
+        mapper = PronunciationMapper(["transaction", "트랜잭션"])
+        self.assertEqual(mapper.map_sentence("transaction 로그"), "transaction 로그")
 
 
 if __name__ == "__main__":

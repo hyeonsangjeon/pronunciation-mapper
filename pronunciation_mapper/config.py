@@ -29,10 +29,20 @@ ENG_TO_KOR_SOUNDS = {
 # 1:N
 #  STT초기출력 :원하는 출력 
 DB_TERM_MAPPINGS = {
-    '커스터머':'customer',
-    '커스타마':'customer',
-    '프로덕트':'product'
-#...추가하세요. 
+    '커스터머': 'customer',
+    '커스타마': 'customer',
+    '프로덕트': 'product',
+    '트랜잭션': 'transaction',
+    '트랜젝션': 'transaction',
+    '페이먼트': 'payment',
+    '쉬핑': 'shipping',
+    '인보이스': 'invoice',
+    '그라운드': 'ground',
+    '클라우드': 'cloud',
+    '서버': 'server',
+    '데이타베이스': '데이터베이스',
+    '데이타배이스': '데이터베이스',
+# ...프로젝트 고유 용어를 추가하세요.
 }
 
 
@@ -50,3 +60,6 @@ NUMBER_MAPPINGS = {
     '구구': '99', '백일': '101'
 }
 
+# ``convert_korean_numbers``의 이전 공개 API와의 호환용 직접 매핑입니다.
+# 프로젝트별 숫자형 고유명사는 이 사전에 명시적으로 추가할 수 있습니다.
+SPECIAL_NUMERIC_TERMS = {}

@@ -1,341 +1,380 @@
-import numpy as np
+"""결정적 발음 후보 생성기와 V1 호환 매퍼."""
+
+import logging
 import re
+from collections.abc import Mapping
+
 from jamo import h2j, j2hcj
-from .config import DEFAULT_THRESHOLD, ENG_TO_KOR_SOUNDS, DB_TERM_MAPPINGS, PRONUNCIATION_RULES
+
+from .config import DEFAULT_THRESHOLD, DB_TERM_MAPPINGS, ENG_TO_KOR_SOUNDS, PRONUNCIATION_RULES
+from .utils import convert_korean_numbers_correctly
+
+
+logger = logging.getLogger(__name__)
+
+KOREAN_PARTICLES = (
+    "으로", "에서", "에게", "한테", "처럼", "같이", "보다",
+    "께", "이", "가", "을", "를", "의", "에", "로", "과", "와",
+    "은", "는", "도", "만",
+)
+LEXICAL_TOKEN_PATTERN = re.compile(r"[가-힣A-Za-z0-9_]+")
+
+
+def split_korean_particle(word):
+    """단어 끝의 대표적인 한국어 조사를 ``(어간, 조사)``로 분리합니다."""
+    for particle in KOREAN_PARTICLES:
+        if word.endswith(particle) and len(word) > len(particle):
+            return word[:-len(particle)], particle
+    return word, ""
+
 
 class PronunciationMapper:
+    """V1 공개 API를 유지하는 로컬 발음 기반 매퍼.
+
+    V2에서는 이 클래스가 네트워크 호출 전에 exact mapping과 top-k 후보를
+    만드는 결정적 안전망으로 사용됩니다.
+    """
+
     def __init__(self, db_terms, threshold=None, custom_mappings=None):
-        """
-        db_terms: 데이터베이스 용어 목록
-        threshold: 유사도 임계값 (기본값은 설정 파일에서 로드)
-        custom_mappings: 사용자 정의 매핑 (기본 매핑에 추가됨)
-        """
-        self.db_terms = db_terms
-        self.threshold = threshold if threshold is not None else DEFAULT_THRESHOLD
-        
-        # 기본 매핑 로드
+        if isinstance(db_terms, (str, bytes)):
+            raise TypeError("db_terms must be an iterable of strings, not a string")
+        raw_terms = list(db_terms)
+        if any(not isinstance(term, str) or not term for term in raw_terms):
+            raise ValueError("db_terms must contain only non-empty strings")
+        if isinstance(threshold, bool) or not isinstance(
+            DEFAULT_THRESHOLD if threshold is None else threshold, (int, float)
+        ) or not 0.0 <= (DEFAULT_THRESHOLD if threshold is None else threshold) <= 1.0:
+            raise ValueError("threshold must be between 0 and 1")
+        if custom_mappings is not None:
+            if not isinstance(custom_mappings, Mapping):
+                raise TypeError("custom_mappings must be a mapping")
+            if any(
+                not isinstance(source, str)
+                or not source
+                or not isinstance(target, str)
+                or not target
+                for source, target in custom_mappings.items()
+            ):
+                raise ValueError("custom_mappings must contain non-empty string pairs")
+
+        self.db_terms = list(dict.fromkeys(raw_terms))
+        self.threshold = DEFAULT_THRESHOLD if threshold is None else threshold
         self.eng_to_kor_sounds = ENG_TO_KOR_SOUNDS.copy()
         self.term_mappings = DB_TERM_MAPPINGS.copy()
-        
-        # 사용자 정의 매핑 처리
         if custom_mappings:
-            # 매핑 방향 유지 (한글->영어 또는 영어->한글)
-            for source, target in custom_mappings.items():
-                # 기존 매핑에 추가
-                self.term_mappings[source] = target
-                
-                # target이 DB 용어 목록에 있는 경우 역방향 매핑도 추가
-                if target in self.db_terms and source not in self.term_mappings:
-                    # 중복되지 않게 역방향 추가
-                    self.term_mappings[target] = source
-        
-        # DB 용어에 있는 모든 단어에 대한 역방향 매핑 구성
+            self.term_mappings.update(custom_mappings)
+
+        self.pronunciation_rules = PRONUNCIATION_RULES["korean"]
         self._build_bidirectional_mappings()
-        
-        # 발음 규칙
-        self.pronunciation_rules = PRONUNCIATION_RULES['korean']
-        
-        # 사전 계산된 DB 용어 발음 사전 구축
-        self.db_term_pronunciations = {}
-        for term in db_terms:
-            self.db_term_pronunciations[term] = self._get_normalized_pronunciation(term)
-    
+        self._refresh_indexes()
 
     def _build_bidirectional_mappings(self):
-        """양방향 매핑을 구성합니다"""
-        # 한글-영어 매핑을 기반으로 역방향 매핑 구성
-        kor_to_eng_mappings = {}
-        eng_to_kor_mappings = {}
-        
-        # 기존 매핑 분류
-        for source, target in self.term_mappings.items():
-            # 한글 -> 영어 매핑인 경우
-            if (any('\uAC00' <= c <= '\uD7A3' for c in source) and 
-                target in self.db_terms and 
-                not any('\uAC00' <= c <= '\uD7A3' for c in target)):
-                kor_to_eng_mappings[source] = target
-            # 영어 -> 한글 매핑인 경우
-            elif (source in self.db_terms and 
-                any('\uAC00' <= c <= '\uD7A3' for c in target) and 
-                not any('\uAC00' <= c <= '\uD7A3' for c in source)):
-                eng_to_kor_mappings[source] = target
-        
-        # 누락된 역방향 매핑 추가
-        for kor, eng in kor_to_eng_mappings.items():
-            if eng not in self.term_mappings:
-                self.term_mappings[eng] = kor
-        
-        for eng, kor in eng_to_kor_mappings.items():
-            if kor not in self.term_mappings:
-                self.term_mappings[kor] = eng
+        """발음 인덱스용 reverse alias를 direct rewrite 규칙과 분리합니다.
 
+        canonical target을 ``term_mappings``에 역방향으로 넣으면 두 표기가 모두
+        DB vocabulary일 때 이미 정규형인 target이 source로 되돌아갑니다.
+        """
+        self.reverse_aliases = {}
+        for source, target in self.term_mappings.items():
+            if target in self.db_terms and source != target:
+                self.reverse_aliases.setdefault(target, source)
+
+    def _refresh_indexes(self):
+        self.aliases_by_target = {term: [] for term in self.db_terms}
+        for source, target in self.term_mappings.items():
+            if target in self.aliases_by_target and source != target:
+                self.aliases_by_target[target].append(source)
+
+        for aliases in self.aliases_by_target.values():
+            aliases.sort(key=lambda value: (-len(value), value))
+
+        self._alias_pairs = sorted(
+            (
+                (source, target)
+                for source, target in self.term_mappings.items()
+                if source and source != target and target in self.aliases_by_target
+            ),
+            key=lambda item: (-len(item[0]), item[0], item[1]),
+        )
+        self._canonical_terms_by_length = sorted(
+            self.db_terms, key=lambda value: (-len(value), value)
+        )
+        self.db_term_pronunciations = {
+            term: self._get_normalized_pronunciation(term) for term in self.db_terms
+        }
+        # 하나의 canonical term에 여러 전사가 있을 수 있습니다. 첫 reverse
+        # alias 하나만 대표로 쓰면 사용자 alias의 작은 ASR 오차를 놓치므로,
+        # canonical 표기와 모든 alias 발음 중 최소 거리를 사용합니다.
+        self.pronunciations_by_target = {}
+        for term in self.db_terms:
+            pronunciations = [self._get_pronunciation(term)]
+            pronunciations.extend(
+                self._get_pronunciation(alias) for alias in self.aliases_by_target[term]
+            )
+            self.pronunciations_by_target[term] = tuple(dict.fromkeys(pronunciations))
 
     def _get_normalized_pronunciation(self, word):
-        """단어를 정규화된 발음으로 변환"""
-        # 직접 매핑이 있는 경우 매핑된 발음 사용
-        if word in self.term_mappings:
-            return self._get_pronunciation(self.term_mappings[word])
-        
+        mapped = self.term_mappings.get(word)
+        if mapped is not None:
+            return self._get_pronunciation(mapped)
         return self._get_pronunciation(word)
-    
+
     def _get_pronunciation(self, word):
-        """단어를 음소로 변환"""
-        # 한글인 경우
-        if any('\uAC00' <= c <= '\uD7A3' for c in word):
-            # 한글 자모 분리
+        if any("가" <= char <= "힣" for char in word):
             return self._get_korean_pronunciation(word)
-        
-        # 영어인 경우 영한 발음 변환 
         return self._convert_eng_to_kor_sound(word.lower())
-    
+
     def _get_korean_pronunciation(self, word):
-        """한글 단어를 자모 시퀀스로 변환"""
         try:
-            # 한글 자모 분리 (예: '안녕' -> 'ㅇㅏㄴㄴㅕㅇ')
             jamo_sequence = j2hcj(h2j(word))
-            
-            # 발음 규칙 적용
             for pattern, replacement in self.pronunciation_rules:
                 jamo_sequence = re.sub(pattern, replacement, jamo_sequence)
-                
             return jamo_sequence
-        except Exception as e:
-            print(f"자모 분리 오류: {str(e)}")
+        except Exception:
+            logger.exception("한글 자모 분리에 실패했습니다: %r", word)
             return word
-    
+
     def _convert_eng_to_kor_sound(self, word):
-        """영어 단어를 한글 발음으로 변환"""
-        result = []
-        for char in word:
-            if char in self.eng_to_kor_sounds:
-                result.append(self.eng_to_kor_sounds[char])
-            else:
-                result.append(char)
-        return ''.join(result)
-    
+        return "".join(self.eng_to_kor_sounds.get(char, char) for char in word)
+
     def _calculate_levenshtein_distance(self, s1, s2):
-        """두 문자열 간의 편집 거리 계산"""
         if len(s1) < len(s2):
             return self._calculate_levenshtein_distance(s2, s1)
-        
-        if len(s2) == 0:
+        if not s2:
             return len(s1)
-        
-        previous_row = range(len(s2) + 1)
-        for i, c1 in enumerate(s1):
-            current_row = [i + 1]
-            for j, c2 in enumerate(s2):
-                insertions = previous_row[j + 1] + 1
-                deletions = current_row[j] + 1
-                substitutions = previous_row[j] + (c1 != c2)
+
+        previous_row = list(range(len(s2) + 1))
+        for index, char1 in enumerate(s1):
+            current_row = [index + 1]
+            for column, char2 in enumerate(s2):
+                insertions = previous_row[column + 1] + 1
+                deletions = current_row[column] + 1
+                substitutions = previous_row[column] + (char1 != char2)
                 current_row.append(min(insertions, deletions, substitutions))
             previous_row = current_row
-        
         return previous_row[-1]
-    
+
     def _normalized_distance(self, s1, s2):
-        """정규화된 편집 거리 (0~1 사이 값)"""
-        distance = self._calculate_levenshtein_distance(s1, s2)
         max_len = max(len(s1), len(s2))
         if max_len == 0:
-            return 0
-        return distance / max_len
-    
+            return 0.0
+        return self._calculate_levenshtein_distance(s1, s2) / max_len
+
+    def _direct_target(self, source):
+        target = self.term_mappings.get(source)
+        return target if target in self.db_terms else None
+
+    def replace_known_aliases(self, text):
+        """명시적 alias만 부분 치환하고 나머지 문자는 그대로 보존합니다.
+
+        연속된 두 alias는 검색어가 합쳐지지 않도록 공백으로 구분합니다.
+        예: ``신규커스터머정보`` -> ``신규customer정보``,
+        ``클라우드서버`` -> ``cloud server``.
+
+        반환값은 ``(치환 문자열 또는 None, canonical term tuple)``입니다.
+        """
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+
+        parts = []
+        canonical_terms = []
+        position = 0
+        previous_was_known_term = False
+        changed = False
+
+        while position < len(text):
+            matched = next(
+                (
+                    (alias, target)
+                    for alias, target in self._alias_pairs
+                    if text.startswith(alias, position)
+                ),
+                None,
+            )
+            if matched is None:
+                canonical = next(
+                    (
+                        term
+                        for term in self._canonical_terms_by_length
+                        if text.startswith(term, position)
+                    ),
+                    None,
+                )
+                if canonical is not None:
+                    if previous_was_known_term:
+                        parts.append(" ")
+                    parts.append(canonical)
+                    canonical_terms.append(canonical)
+                    position += len(canonical)
+                    previous_was_known_term = True
+                    continue
+                parts.append(text[position])
+                position += 1
+                previous_was_known_term = False
+                continue
+
+            alias, target = matched
+            if previous_was_known_term:
+                parts.append(" ")
+            parts.append(target)
+            canonical_terms.append(target)
+            position += len(alias)
+            previous_was_known_term = True
+            changed = True
+
+        if not changed:
+            return None, ()
+        return "".join(parts), tuple(canonical_terms)
+
+    def canonical_ranges(self, text):
+        """이미 canonical인 DB term이 차지하는 비중첩 문자 범위를 반환합니다.
+
+        punctuation을 포함한 식별자(``customer-id``, ``schema.table``)가
+        lexical tokenizer에서 여러 조각으로 나뉘더라도 각 조각을 다시 fuzzy
+        치환하지 않기 위한 보호 범위입니다.
+        """
+        ranges = []
+        for term in sorted(self.db_terms, key=lambda value: (-len(value), value)):
+            position = 0
+            while True:
+                start = text.find(term, position)
+                if start < 0:
+                    break
+                end = start + len(term)
+                ranges.append((start, end))
+                position = end
+
+        merged = []
+        for start, end in sorted(ranges):
+            if merged and start < merged[-1][1]:
+                if end > merged[-1][1]:
+                    merged[-1] = (merged[-1][0], end)
+                continue
+            merged.append((start, end))
+        return tuple(merged)
+
+    def rank_candidates(self, query_term, limit=5):
+        """DB vocabulary 안에서 발음상 가까운 후보를 거리 오름차순으로 반환합니다.
+
+        반환값은 ``[(replacement, distance), ...]``이며 조사가 있으면 replacement에
+        보존됩니다. ``distance``는 V1과 동일하게 0이 가장 가깝습니다.
+        """
+        if limit < 1:
+            return []
+
+        normalized = convert_korean_numbers_correctly(query_term)
+        scores = {}
+
+        direct = self._direct_target(normalized)
+        if direct:
+            scores[direct] = 0.0
+
+        if normalized in self.db_term_pronunciations:
+            scores[normalized] = 0.0
+
+        # identifier 또는 canonical term을 이미 포함한 토큰은 전체를 발음
+        # 후보로 덮어쓰지 않습니다. explicit alias 부분 치환은 별도 계층에서
+        # 처리하므로 account_id/XPN36prod 같은 suffix가 사라지지 않습니다.
+        contains_canonical_substring = any(
+            term != normalized and term in normalized for term in self.db_terms
+        )
+        is_ascii_alphanumeric_identifier = (
+            normalized.isascii()
+            and any(char.isalpha() for char in normalized)
+            and any(char.isdigit() for char in normalized)
+        )
+        if (
+            "_" in normalized
+            or contains_canonical_substring
+            or is_ascii_alphanumeric_identifier
+        ):
+            return sorted(scores.items(), key=lambda item: (item[1], item[0]))[:limit]
+
+        whole_pronunciation = self._get_normalized_pronunciation(normalized)
+        for term, pronunciations in self.pronunciations_by_target.items():
+            distance = min(
+                self._normalized_distance(whole_pronunciation, pronunciation)
+                for pronunciation in pronunciations
+            )
+            scores[term] = min(distance, scores.get(term, 1.0))
+
+        # 단어 끝이 조사처럼 보이더라도 전체 토큰 후보를 버리지 않습니다.
+        # 조사 분리 후보에는 작은 penalty를 주어 ``엠에쓰아이``가 ``MSI이``로
+        # 오염되는 것을 막고, 문맥 resolver에는 두 가능성을 모두 제공합니다.
+        base, particle = split_korean_particle(normalized)
+        if particle:
+            base_direct = self._direct_target(base)
+            if base_direct:
+                scores[base_direct + particle] = 0.0
+            if base in self.db_term_pronunciations:
+                scores[base + particle] = 0.0
+
+            base_pronunciation = self._get_normalized_pronunciation(base)
+            particle_penalty = 0.15
+            for term, pronunciations in self.pronunciations_by_target.items():
+                distance = min(
+                    self._normalized_distance(base_pronunciation, pronunciation)
+                    for pronunciation in pronunciations
+                )
+                replacement = term + particle
+                distance = min(1.0, distance + particle_penalty)
+                scores[replacement] = min(distance, scores.get(replacement, 1.0))
+
+        return sorted(scores.items(), key=lambda item: (item[1], item[0]))[:limit]
 
     def find_closest_term(self, query_term, threshold=None):
-        """쿼리 용어와 가장 유사한 DB 용어 찾기"""
-        if threshold is None:
-            threshold = self.threshold
-        
-        # 숫자 표현 전처리
-        from .utils import convert_korean_numbers_correctly
-        query_term = convert_korean_numbers_correctly(query_term)
-        
-        # 원본 단어 저장
-        original_query = query_term
-        
-        # 매핑 대상 후보
-        mapping_candidates = []
-        
-        # 한글 조사 패턴 정의 (대표적인 조사들)
-        import re
-        josa_pattern = r'(이|가|을|를|의|에|에서|로|으로|과|와|은|는|도|만|께|에게|한테|보다|처럼|같이)$'
-        
-        # 1. 전체 단어에 대한 직접 매핑 확인
-        if query_term in self.term_mappings:
-            mapped = self.term_mappings[query_term]
-            if mapped in self.db_terms:
-                return mapped, 0.0  # 완벽 매칭
-        
-        # 2. 복합어 처리: 알려진 DB 용어를 단어 내에서 찾기
-        for db_term in self.db_terms:
-            # 한글 단어에서 영문 DB 용어를 찾는 것은 의미가 없으므로 건너뜀
-            if any('\uAC00' <= c <= '\uD7A3' for c in query_term) and all(ord(c) < 128 for c in db_term):
-                continue
-                
-            # DB 용어의 한글 매핑 확인
-            korean_term = None
-            for k, v in self.term_mappings.items():
-                if v == db_term:
-                    korean_term = k
-                    break
-            
-            # 한글 원본과 한글 매핑 모두 확인
-            check_terms = [db_term]
-            if korean_term:
-                check_terms.append(korean_term)
-                
-            for term in check_terms:
-                if term in query_term:
-                    # 부분 매칭 찾음 (예: "로그" in "트랜잭션로그")
-                    if term != db_term:  # 한글 -> 영문 변환 필요
-                        # 단어 위치와 주변 문맥 고려
-                        start_idx = query_term.find(term)
-                        end_idx = start_idx + len(term)
-                        
-                        # 뒤에 조사가 있는지 확인
-                        remaining = query_term[end_idx:]
-                        josa_match = re.match(r'^([가-힣]+)', remaining)
-                        
-                        if josa_match:
-                            josa = josa_match.group(1)
-                            new_query = query_term[:start_idx] + db_term + josa + remaining[len(josa):]
-                        else:
-                            new_query = query_term[:start_idx] + db_term + remaining
-                        
-                        mapping_candidates.append((new_query, 0.1))  # 낮은 점수(높은 우선순위)
-        
-        # 3. 발음 유사도 기반 매핑 (전체 단어에 대해)
-        query_pronunciation = self._get_normalized_pronunciation(query_term)
-        best_match = None
-        best_score = float('inf')
-        
-        for term, pronunciation in self.db_term_pronunciations.items():
-            score = self._normalized_distance(query_pronunciation, pronunciation)
-            if score < best_score:
-                best_score = score
-                best_match = term
-        
-        if best_score <= threshold:
-            # 조사 추출 시도
-            josa_match = re.search(josa_pattern, query_term)
-            if josa_match:
-                josa = josa_match.group(0)
-                # 원래 단어에서 조사 제외한 부분을 매핑하고 조사를 유지
-                base_term = query_term[:-len(josa)]
-                new_term = best_match + josa
-                mapping_candidates.append((new_term, best_score))
-            else:
-                mapping_candidates.append((best_match, best_score))
-        
-        # 4. 부분 단어 매핑 (한글 + 기타 문자 조합)
-        parts = re.findall(r'[가-힣]+|[a-zA-Z0-9]+', query_term)
-        
-        if len(parts) > 1:
-            for i, part in enumerate(parts):
-                # 각 부분에 대해 매핑 시도
-                if any('\uAC00' <= c <= '\uD7A3' for c in part):  # 한글 부분만 매핑
-                    # 직접 매핑 확인
-                    if part in self.term_mappings:
-                        mapped_part = self.term_mappings[part]
-                        if mapped_part in self.db_terms:
-                            # 전체 문장에서 해당 부분의 위치 찾기
-                            start_pos = query_term.find(part)
-                            if start_pos >= 0:
-                                end_pos = start_pos + len(part)
-                                
-                                # 뒤에 조사가 있는지 확인
-                                remaining = query_term[end_pos:]
-                                josa_match = re.match(r'^([가-힣]+)', remaining)
-                                
-                                # 새로운 문장 구성
-                                if josa_match:
-                                    josa = josa_match.group(1)
-                                    new_query = query_term[:start_pos] + mapped_part + josa + remaining[len(josa):]
-                                else:
-                                    new_query = query_term[:start_pos] + mapped_part + remaining
-                                
-                                mapping_candidates.append((new_query, 0.2))
-                    
-                    # 발음 유사도 기반 매핑
-                    part_pronunciation = self._get_normalized_pronunciation(part)
-                    best_part_match = None
-                    best_part_score = float('inf')
-                    
-                    for term, pronunciation in self.db_term_pronunciations.items():
-                        score = self._normalized_distance(part_pronunciation, pronunciation)
-                        if score < best_part_score:
-                            best_part_score = score
-                            best_part_match = term
-                    
-                    if best_part_score <= threshold:
-                        # 전체 문장에서 해당 부분의 위치 찾기
-                        start_pos = query_term.find(part)
-                        if start_pos >= 0:
-                            end_pos = start_pos + len(part)
-                            
-                            # 뒤에 조사가 있는지 확인
-                            remaining = query_term[end_pos:]
-                            josa_match = re.match(r'^([가-힣]+)', remaining)
-                            
-                            # 새로운 문장 구성
-                            if josa_match:
-                                josa = josa_match.group(1)
-                                new_query = query_term[:start_pos] + best_part_match + josa + remaining[len(josa):]
-                            else:
-                                new_query = query_term[:start_pos] + best_part_match + remaining
-                            
-                            mapping_candidates.append((new_query, best_part_score + 0.3))
-        
-        # 최적의 매핑 선택 (가장 낮은 점수)
-        if mapping_candidates:
-            mapping_candidates.sort(key=lambda x: x[1])  # 점수 기준 정렬
-            return mapping_candidates[0]
-        
-        # 매칭되는 항목이 없으면 원래 단어 반환
-        return original_query, 1.0
-    
+        """쿼리 용어와 가장 가까운 DB 용어를 ``(문자열, 거리)``로 반환합니다."""
+        threshold = self.threshold if threshold is None else threshold
+        normalized = convert_korean_numbers_correctly(query_term)
 
+        direct = self._direct_target(normalized)
+        if direct:
+            return direct, 0.0
+        if normalized in self.db_terms:
+            return normalized, 0.0
 
-    
+        base, particle = split_korean_particle(normalized)
+        base_direct = self._direct_target(base)
+        if base_direct:
+            return base_direct + particle, 0.0
+        if base in self.db_terms:
+            return base + particle, 0.0
+
+        alias_replacement, _ = self.replace_known_aliases(normalized)
+        if alias_replacement is not None:
+            return alias_replacement, 0.1
+
+        ranked = self.rank_candidates(normalized, limit=1)
+        if ranked and ranked[0][1] <= threshold:
+            return ranked[0]
+        return normalized, 1.0
+
     def map_sentence(self, sentence):
-        """문장 내 단어들을 DB 용어로 매핑"""
-        # 숫자 표현 전처리 - 먼저 전체 문장에 대해 수행
-        from .utils import convert_korean_numbers_correctly
-        sentence = convert_korean_numbers_correctly(sentence)
-        
-        words = sentence.split()
-        mapped_words = []
-        
-        for word in words:
-            mapped_term, score = self.find_closest_term(word)
-            mapped_words.append(mapped_term)
-        
-        return ' '.join(mapped_words)
+        """공백과 구두점을 보존하며 문장 안의 lexical token을 매핑합니다."""
+        normalized = convert_korean_numbers_correctly(sentence)
+        canonical_ranges = self.canonical_ranges(normalized)
 
+        def replace(match):
+            overlaps_canonical = any(
+                match.start() < end and match.end() > start
+                for start, end in canonical_ranges
+            )
+            alias_replacement, _ = self.replace_known_aliases(match.group(0))
+            if overlaps_canonical and alias_replacement is None:
+                return match.group(0)
+            mapped, _ = self.find_closest_term(match.group(0))
+            return mapped
 
+        return LEXICAL_TOKEN_PATTERN.sub(replace, normalized)
 
     def add_custom_mapping(self, source_term, target_term, add_to_db_terms=True):
-        """
-        사용자 정의 매핑 추가
-        
-        Args:
-            source_term: 원본 용어
-            target_term: 대상 용어
-            add_to_db_terms: True일 경우 target_term을 DB 용어 목록에 자동 추가
-        """
+        """사용자 매핑을 추가하고 후보 인덱스를 즉시 갱신합니다."""
+        if not isinstance(source_term, str) or not source_term:
+            raise ValueError("source_term must be a non-empty string")
+        if not isinstance(target_term, str) or not target_term:
+            raise ValueError("target_term must be a non-empty string")
         self.term_mappings[source_term] = target_term
-        
-        # 매핑 대상을 DB 용어에 자동 추가 (선택적)
         if add_to_db_terms and target_term not in self.db_terms:
             self.db_terms.append(target_term)
-            # DB 용어 발음 사전 업데이트
-            self.db_term_pronunciations[target_term] = self._get_normalized_pronunciation(target_term)
-        
-        # 역방향 매핑도 추가 (필요시)
-        if target_term not in self.term_mappings:
-            self.term_mappings[target_term] = source_term
-        
-        # 발음 사전 업데이트 (항목이 이미 DB 용어에 있는 경우)
-        elif target_term in self.db_terms and target_term not in self.db_term_pronunciations:
-            self.db_term_pronunciations[target_term] = self._get_normalized_pronunciation(target_term)
+        self._build_bidirectional_mappings()
+        self._refresh_indexes()

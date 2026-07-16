@@ -13,7 +13,6 @@ __pycache__/
 *.excalidraw
 # C extensions
 *.so
-C*
 
 # Distribution / packaging
 .Python
@@ -181,3 +180,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Pronunciation Mapper V2 local configuration and generated eval reports
+.env
+.env.*
+!.env.example
+evals/results/
+docs/design/

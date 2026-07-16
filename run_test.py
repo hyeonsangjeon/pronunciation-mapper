@@ -11,7 +11,7 @@ def main():
     db_terms = [
         'customer', 'product', 'transaction', 
         'payment', 'shipping', 'invoice',
-        'ground',  'server',
+        'ground', 'cloud', 'server',
         '데이터베이스', '테이블', '필드',
         '인덱스', '쿼리', 'svc66','log','account_no','account_id' ,'서버', 'konlpy', 'XPN36', 'ST주식회사','KF주식회사','SF주식회사','SMTA','svc_accnt'
     ]
