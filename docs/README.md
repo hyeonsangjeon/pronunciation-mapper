@@ -13,6 +13,7 @@
 - [V2 아키텍처 결정 기록](V2_ARCHITECTURE.md): bounded agent 구조, provider 선택, guardrail, 평가 전략
 - [아키텍처 결정 기록 index](decisions/README.md): 구조를 선택한 이유와 결과
 - [GitHub Actions와 external-tenant Foundry 설정](CI_SETUP.md): OIDC, Environment, RBAC, live workflow
+- [PyPI 릴리스 운영](PYPI_RELEASE.md): Trusted Publisher, OIDC publish workflow, 첫 게시와 복구 절차
 
 ## 변경과 릴리스
 
