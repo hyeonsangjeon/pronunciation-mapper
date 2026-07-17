@@ -1,7 +1,7 @@
 """구조화 판정 provider가 구현해야 하는 최소 계약과 오류 분류."""
 
 import asyncio
-from typing import Any, NoReturn, Protocol, runtime_checkable
+from typing import NoReturn, Protocol, runtime_checkable
 
 from ..errors import ProviderConfigurationError, ProviderUnavailableError
 from ..models import DecisionRequest, ProviderResponse

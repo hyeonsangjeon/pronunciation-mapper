@@ -172,6 +172,16 @@ class TestAgenticPronunciationMapper(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await mapper.rewrite(value)).rewritten_text, value)
         self.assertEqual(provider.calls, [])
 
+    async def test_punctuation_separated_particles_survive_v2_fallback(self):
+        provider = ScriptedProvider(error=ConnectionError("offline"))
+        mapper = AgenticPronunciationMapper(
+            ["customer", "C++", "10000"], provider=provider
+        )
+
+        for source in ('"customer"만 조회', "(customer)만 조회", "C++만 조회"):
+            with self.subTest(source=source):
+                self.assertEqual((await mapper.rewrite(source)).rewritten_text, source)
+
     async def test_mixed_canonical_and_alias_compound_is_deterministic(self):
         provider = ScriptedProvider()
         mapper = AgenticPronunciationMapper(

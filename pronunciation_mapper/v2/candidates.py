@@ -119,7 +119,12 @@ class CandidateGenerator:
                 method=method,
             )
 
-        for replacement_text, distance in self.mapper.rank_candidates(source, limit=self.top_k + 2):
+        # Engine already normalizes the full sentence. Re-normalizing an isolated
+        # token here would lose particle context (for example ``C++만``) and
+        # could reinterpret the bare particle as a number.
+        for replacement_text, distance in self.mapper._rank_candidates_normalized(
+            source, limit=self.top_k + 2
+        ):
             if replacement_text == source or distance > self.candidate_threshold:
                 continue
             canonical = self._canonical_terms(replacement_text)

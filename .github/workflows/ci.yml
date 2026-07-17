@@ -49,6 +49,9 @@ jobs:
       - name: Run offline test suite
         run: python -m pytest -q -m "not integration"
 
+      - name: Lint source and tests
+        run: python -m ruff check .
+
   quality:
     name: Eval, package, and Pages
     runs-on: ubuntu-latest

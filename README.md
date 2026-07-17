@@ -1,35 +1,35 @@
 # Pronunciation Mapper V2
 
+[![PyPI](https://img.shields.io/pypi/v/pronunciation-mapper)](https://pypi.org/project/pronunciation-mapper/)
+[![Python](https://img.shields.io/pypi/pyversions/pronunciation-mapper)](https://pypi.org/project/pronunciation-mapper/)
+[![CI](https://github.com/hyeonsangjeon/pronunciation-mapper/actions/workflows/ci.yml/badge.svg)](https://github.com/hyeonsangjeon/pronunciation-mapper/actions/workflows/ci.yml)
+[![Downloads](https://img.shields.io/pypi/dm/pronunciation-mapper?label=downloads%2Fmonth)](https://pypistats.org/packages/pronunciation-mapper)
+[![License](https://img.shields.io/pypi/l/pronunciation-mapper)](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/LICENSE)
+
+[English](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/README-EN.md) · [사용 매뉴얼](https://hyeonsangjeon.github.io/pronunciation-mapper/) · [PyPI](https://pypi.org/project/pronunciation-mapper/)
+
 한국어 ASR 결과를 DB의 고유명사·기술 용어로 안전하게 정규화하는 Query Rewriting 라이브러리입니다.
 
 V2는 기존 자모/편집거리 휴리스틱을 버리지 않습니다. 로컬에서 exact mapping과 발음 top‑K 후보를 만든 뒤, **Microsoft Foundry를 기본 decision agent**로 사용해 문맥상 올바른 후보 ID만 선택합니다. Ollama는 로컬 옵션이며 OpenAI·Claude provider는 reference-only입니다.
 
-- Python 3.10+
-- 기본 provider: Microsoft Foundry Project Responses API + Microsoft Entra ID
-- 선택 provider: Ollama native API
-- OpenAI / Claude: 확장 계약 참고용이며 V2 adapter 없음
-- 기존 `PronunciationMapper` API와 CLI 유지
+| 실행 방식 | Provider | 인증 | 용도 |
+| --- | --- | --- | --- |
+| Deterministic core | 로컬 휴리스틱 | 없음 | exact alias, 숫자 정규화, V1 호환 API/CLI |
+| 기본 decision agent | Microsoft Foundry | Microsoft Entra ID | 문맥이 필요한 bounded candidate 선택 |
+| 선택형 local agent | Ollama | 없음 | 명시적으로 선택하는 로컬 모델 실행 |
+| Reference only | OpenAI·Claude | 해당 없음 | V2 adapter를 제공하지 않는 확장 계약 참고 |
+
+Python 3.10–3.13을 CI에서 검증하며 기존 `PronunciationMapper` API와 CLI를 유지합니다.
+
+다운로드 배지는 PSF의 공개 PyPI 통계를 사용하는 [pypistats](https://pypistats.org/)의 최근 월간 집계이며, 알려진 mirror를 제외하고 하루 한 번 갱신됩니다. 신규 package는 첫 집계 전까지 색인 대기 상태로 보일 수 있습니다.
 
 ## 왜 하이브리드인가
 
 LLM에게 문장 전체를 자유롭게 다시 쓰게 하면 DB vocabulary 밖의 단어 생성, 대소문자·ID 훼손, 비용 증가, 재현성 저하가 생깁니다. V2는 모델의 권한을 의도적으로 줄입니다.
 
-```mermaid
-flowchart LR
-    A["ASR text"] --> B["Local number and alias normalization"]
-    B --> C["Jamo / edit-distance top-K retrieval"]
-    C --> D{"Exact decision?"}
-    D -->|Yes| E["Apply locally"]
-    D -->|No| F["Foundry or Ollama decision agent"]
-    F --> G["Validate schema, span, candidate ID, DB vocabulary"]
-    G -->|Valid and confident| H["Apply selected candidate"]
-    G -->|Abstain / low confidence| I["Keep source"]
-    F -->|Unavailable / invalid| J["Deterministic fallback policy"]
-    E --> K["RewriteResult with trace metadata"]
-    H --> K
-    I --> K
-    J --> K
-```
+> **ASR text → 로컬 숫자·alias 정규화 → 자모/편집거리 top‑K → Foundry 또는 Ollama의 candidate ID 선택 → 로컬 계약 검증 → `RewriteResult`**
+
+Exact alias는 provider 호출 없이 적용합니다. 모델이 `keep`/`abstain`을 선택하면 원문을 보존하고, provider가 실패하거나 계약 밖 응답을 내면 명시한 deterministic fallback을 적용합니다.
 
 핵심 불변식은 다음과 같습니다.
 
@@ -81,6 +81,30 @@ python -m pip install -e '.[dev,foundry,ollama]'
 ```
 
 ## 빠른 시작
+
+### 네트워크 없이 — V1 호환 API
+
+```python
+from pronunciation_mapper import PronunciationMapper
+
+mapper = PronunciationMapper(
+    ["customer", "server", "데이터베이스"],
+    custom_mappings={"서버": "server"},
+)
+
+query = "커스터머,  서버에서 조회"
+result = mapper.map_sentence(query)
+
+print(f"입력: {query}")
+print(f"출력: {result}")
+```
+
+실행 결과:
+
+```text
+입력: 커스터머,  서버에서 조회
+출력: customer,  server에서 조회
+```
 
 ### Microsoft Foundry — 기본
 
@@ -187,7 +211,7 @@ V2의 기본 heuristic fallback 거리는 `0.35`로 V1 기본값보다 보수적
 
 ## 안전 한계와 숫자 처리
 
-기본값은 입력 4,096자, lexical span 64개, token 256자까지입니다. `max_input_chars`, `max_spans`, `max_token_chars`로 조절할 수 있으며 초과 입력은 임의로 잘라 보내지 않고 거부합니다. Foundry transport도 기본 timeout 30초, retry 1회, output 2,048 token으로 제한합니다.
+기본값은 입력 4,096자, lexical span 64개, token 256자까지입니다. `max_input_chars`, `max_spans`, `max_token_chars`로 조절할 수 있으며 초과 입력은 임의로 잘라 보내지 않고 거부합니다. Foundry transport는 timeout 30초, retry 1회, output 2,048 token으로 제한합니다. Ollama도 timeout 30초와 output 2,048 token 상한을 적용하고 thinking mode를 끕니다.
 
 한글 숫자는 명백한 단위·counter(`일억 원`, `321번`) 또는 긴 번호 문맥만 결정적으로 바꿉니다. `일일이`, `사이사이`, `천만 다행`처럼 숫자와 모양이 같은 일반어는 보존합니다. 프로젝트별 짧은 ID나 숫자형 고유명사는 golden set과 명시적 mapping으로 관리하는 것이 안전합니다.
 
@@ -217,32 +241,6 @@ pronunciation-mapper rewrite '트랜잭숑 로그' \
 
 DB 용어 파일은 문자열 배열 또는 `{"terms": [...]}` 형식을 지원합니다.
 
-## V1 호환 API
-
-```python
-from pronunciation_mapper import PronunciationMapper
-
-mapper = PronunciationMapper(
-    ["customer", "server", "데이터베이스"],
-    custom_mappings={"서버": "server"},
-)
-
-term, distance = mapper.find_closest_term("커스터머")
-sentence = mapper.map_sentence("커스터머,  서버에서 조회")
-
-print(f"단어: 커스터머 → {term} (distance={distance:.1f})")
-print(f"문장: 커스터머,  서버에서 조회 → {sentence}")
-```
-
-실행 결과:
-
-```text
-단어: 커스터머 → customer (distance=0.0)
-문장: 커스터머,  서버에서 조회 → customer,  server에서 조회
-```
-
-V1 클래스는 네트워크나 Azure credential을 요구하지 않습니다. V2에서도 exact mapping, 발음 후보 생성, provider fallback의 로컬 계층으로 사용됩니다.
-
 ## 테스트와 평가
 
 ```bash
@@ -262,15 +260,15 @@ python evals/run_v2.py --provider ollama
 ## 문서
 
 - [PyPI 패키지](https://pypi.org/project/pronunciation-mapper/)
-- [문서와 기록 안내](docs/README.md)
-- [PyPI 릴리스 운영](docs/PYPI_RELEASE.md)
-- [변경 기록](CHANGELOG.md)
-- [V2.0.0 릴리스 기록](docs/releases/v2.0.0.md)
-- [V2 아키텍처와 마이그레이션](docs/V2_ARCHITECTURE.md)
-- [아키텍처 결정 기록](docs/decisions/README.md)
-- [GitHub Actions와 외부 tenant Foundry OIDC 설정](docs/CI_SETUP.md)
-- [V2 eval dataset](evals/cases.jsonl)
-- [환경 변수 예시](.env.example)
+- [문서와 기록 안내](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/README.md)
+- [PyPI 릴리스 운영](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/PYPI_RELEASE.md)
+- [변경 기록](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/CHANGELOG.md)
+- [V2.0.1 릴리스 기록](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/releases/v2.0.1.md)
+- [V2 아키텍처와 마이그레이션](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/V2_ARCHITECTURE.md)
+- [아키텍처 결정 기록](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/decisions/README.md)
+- [GitHub Actions와 외부 tenant Foundry OIDC 설정](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/docs/CI_SETUP.md)
+- [V2 eval dataset](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/evals/cases.jsonl)
+- [환경 변수 예시](https://github.com/hyeonsangjeon/pronunciation-mapper/blob/main/.env.example)
 
 ## 라이선스
 

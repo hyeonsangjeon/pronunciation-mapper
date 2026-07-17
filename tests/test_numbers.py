@@ -63,6 +63,24 @@ class TestKoreanNumbers(unittest.TestCase):
             "user_id 1234",
         )
 
+    def test_ascii_canonical_particles_are_never_numbers(self):
+        for value in (
+            "customer만",
+            "customer만 조회",
+            '"customer"만',
+            "(customer)만",
+            "C++만",
+            "C++이",
+            "account이",
+            "id이",
+            "account_id만",
+            "XPN36만",
+            "계정이 잠겼다",
+            "주문이 완료됐다",
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(convert_korean_numbers_correctly(value), value)
+
     def test_legacy_simple_converter_no_longer_imports_missing_symbol(self):
         self.assertEqual(convert_korean_numbers("육십육"), "66")
 
