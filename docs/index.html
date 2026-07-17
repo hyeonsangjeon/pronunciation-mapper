@@ -85,10 +85,8 @@
               <span>복사</span>
             </button>
           </div>
-          <pre id="hero-install-code"><code><span class="code-comment"># 1. 저장소와 Foundry extra 설치</span>
-<span class="code-prompt">$</span> git clone https://github.com/hyeonsangjeon/pronunciation-mapper.git
-<span class="code-prompt">$</span> cd pronunciation-mapper
-<span class="code-prompt">$</span> pip install -e <span class="code-string">'.[foundry]'</span>
+          <pre id="hero-install-code"><code><span class="code-comment"># 1. PyPI에서 Foundry extra 설치</span>
+<span class="code-prompt">$</span> python -m pip install <span class="code-string">'pronunciation-mapper[foundry]'</span>
 
 <span class="code-comment"># 2. Microsoft Entra ID 로그인</span>
 <span class="code-prompt">$</span> az login
@@ -275,7 +273,7 @@
               </div>
             </div>
             <ul class="check-list">
-              <li><code>pip install -e '.[ollama]'</code></li>
+              <li><code>python -m pip install 'pronunciation-mapper[ollama]'</code></li>
               <li><code>ollama pull qwen3.5:4b</code></li>
               <li>모델별 한국어·JSON 품질 eval 필수</li>
               <li>모델 자동 pull 및 자동 failover 없음</li>

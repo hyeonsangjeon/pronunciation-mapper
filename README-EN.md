@@ -13,8 +13,16 @@ OpenAI and Claude are reference-only providers in V2. The `openai` Python packag
 
 ## Install
 
+For the deterministic mapper and CLI:
+
 ```bash
-pip install -e '.[foundry]'
+python -m pip install pronunciation-mapper
+```
+
+Microsoft Foundry (default V2 provider):
+
+```bash
+python -m pip install 'pronunciation-mapper[foundry]'
 az login
 export FOUNDRY_PROJECT_ENDPOINT='https://<account>.services.ai.azure.com/api/projects/<project>'
 export FOUNDRY_MODEL='<deployment-name>'
@@ -23,9 +31,15 @@ export FOUNDRY_MODEL='<deployment-name>'
 Optional Ollama:
 
 ```bash
-pip install -e '.[ollama]'
+python -m pip install 'pronunciation-mapper[ollama]'
 ollama pull qwen3.5:4b
 export OLLAMA_MODEL='qwen3.5:4b'
+```
+
+For repository development and the full test suite, install from a source checkout:
+
+```bash
+python -m pip install -e '.[dev,foundry,ollama]'
 ```
 
 ## Use

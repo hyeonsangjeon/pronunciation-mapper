@@ -45,13 +45,13 @@ flowchart LR
 기존 로컬 매퍼만 사용할 때:
 
 ```bash
-pip install -e .
+python -m pip install pronunciation-mapper
 ```
 
 Microsoft Foundry 기본 구성:
 
 ```bash
-pip install -e '.[foundry]'
+python -m pip install 'pronunciation-mapper[foundry]'
 az login
 
 export FOUNDRY_PROJECT_ENDPOINT='https://<account>.services.ai.azure.com/api/projects/<project>'
@@ -65,7 +65,7 @@ export FOUNDRY_MODEL='<deployment-name>'
 Ollama 옵션:
 
 ```bash
-pip install -e '.[ollama]'
+python -m pip install 'pronunciation-mapper[ollama]'
 ollama pull qwen3.5:4b
 
 export OLLAMA_HOST='http://localhost:11434'
@@ -73,6 +73,12 @@ export OLLAMA_MODEL='qwen3.5:4b'
 ```
 
 Ollama 모델은 자동으로 pull하지 않습니다. structured output 품질과 한국어 고유명사 정확도는 모델마다 다르므로 이 저장소의 eval set으로 확인해야 합니다.
+
+저장소를 수정하거나 전체 테스트를 실행하는 개발 환경은 source checkout에서 설치합니다.
+
+```bash
+python -m pip install -e '.[dev,foundry,ollama]'
+```
 
 ## 빠른 시작
 
@@ -255,7 +261,9 @@ python evals/run_v2.py --provider ollama
 
 ## 문서
 
+- [PyPI 패키지](https://pypi.org/project/pronunciation-mapper/)
 - [문서와 기록 안내](docs/README.md)
+- [PyPI 릴리스 운영](docs/PYPI_RELEASE.md)
 - [변경 기록](CHANGELOG.md)
 - [V2.0.0 릴리스 기록](docs/releases/v2.0.0.md)
 - [V2 아키텍처와 마이그레이션](docs/V2_ARCHITECTURE.md)

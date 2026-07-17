@@ -6,7 +6,7 @@ Pronunciation Mapper는 PyPI API token이나 계정 password를 GitHub에 저장
 
 | 항목 | 값 |
 | --- | --- |
-| PyPI project | `pronunciation-mapper` |
+| PyPI project | [`pronunciation-mapper`](https://pypi.org/project/pronunciation-mapper/) |
 | GitHub owner | `hyeonsangjeon` |
 | GitHub repository | `pronunciation-mapper` |
 | Workflow | `pypi-publish.yml` |
@@ -14,25 +14,32 @@ Pronunciation Mapper는 PyPI API token이나 계정 password를 GitHub에 저장
 
 PyPI의 publisher 설정과 [publish workflow](../.github/workflows/pypi-publish.yml)의 파일명·Environment가 정확히 일치해야 합니다.
 
-첫 실행 전에 GitHub repository에 `pypi` Environment를 명시적으로 만들고 custom deployment policy를 다음처럼 제한합니다.
+최초 게시 전에 GitHub repository에 `pypi` Environment를 명시적으로 만들었으며 custom deployment policy를 다음처럼 제한했습니다.
 
 - branch: `main`
 - tag: `v*`
 
 Environment에는 PyPI password나 API token을 저장하지 않습니다. 여러 maintainer가 있는 repository라면 required reviewer도 추가합니다.
 
-## 첫 게시
+## 첫 게시 결과
 
-프로젝트가 아직 PyPI에 없을 때 계정의 **Publishing → Add a new pending publisher**에서 위 identity를 등록합니다. Pending Publisher는 이름을 예약하지 않으며, 처음 성공한 trusted publish가 프로젝트를 생성하면서 일반 publisher로 전환합니다.
+`v2.0.0`은 2026-07-17에 [GitHub Actions run 29557116806](https://github.com/hyeonsangjeon/pronunciation-mapper/actions/runs/29557116806)으로 처음 게시했습니다. Pending Publisher가 프로젝트를 생성했고 다음 결과를 확인했습니다.
 
-이미 생성된 `v2.0.0`을 처음 게시할 때는 workflow가 `main`에 merge된 후 다음처럼 실행합니다.
+- [PyPI project](https://pypi.org/project/pronunciation-mapper/): `2.0.0`
+- 배포 파일: universal wheel과 source distribution
+- 게시 방식: OIDC Trusted Publishing
+- 공급망 증빙: 두 파일 모두 PyPI digital attestation과 Sigstore transparency entry 제공, `pypi-attestations` 검증 성공
+- 설치 검증: 새 Python 3.11 환경에서 import, V1 mapping과 CLI smoke 성공
+- 설치 명령: `pip install pronunciation-mapper==2.0.0`
+
+첫 게시에 사용한 수동 dispatch 명령은 다음과 같습니다.
 
 ```bash
 gh workflow run pypi-publish.yml --ref main -f tag=v2.0.0
 gh run list --workflow pypi-publish.yml --limit 1
 ```
 
-Workflow는 요청한 tag를 checkout하고 `pyproject.toml`의 version과 tag가 일치하는지 확인합니다. 이미 게시된 동일 version은 덮어쓰지 않습니다.
+새 프로젝트를 처음 게시할 때는 PyPI 계정의 **Publishing → Add a new pending publisher**에서 위 identity를 먼저 등록합니다. Pending Publisher는 이름을 예약하지 않으며, 처음 성공한 trusted publish가 프로젝트를 생성하면서 일반 publisher로 전환합니다. Workflow는 요청한 tag를 checkout하고 `pyproject.toml`의 version과 tag가 일치하는지 확인합니다. 이미 게시된 동일 version은 덮어쓰지 않습니다.
 
 ## 이후 릴리스
 
