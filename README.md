@@ -86,35 +86,67 @@ from pronunciation_mapper import AgenticPronunciationMapper
 
 async def main():
     async with AgenticPronunciationMapper(
-        db_terms=["XPN36", "account_no", "transaction", "server"],
+        db_terms=["XPN36", "account_no", "transaction", "server", "log"],
         custom_mappings={
             "엑스피엔36": "XPN36",
             "어카운트넘버": "account_no",
             "서버": "server",
+            "로그": "log",
         },
         # provider를 생략하면 azure가 기본입니다.
     ) as mapper:
-        result = await mapper.rewrite(
-            "엑스피엔36 서버에서 어카운트넘버 사삼삼오삼칠의 트랜잭숑 로그"
-        )
-        print(result.rewritten_text)
-        print(result.to_dict())
+        query = "엑스피엔36 서버에서 어카운트넘버 사삼삼오삼칠의 트랜잭숑 로그"
+        result = await mapper.rewrite(query)
+
+        print(f"입력: {query}")
+        print(f"출력: {result.rewritten_text}")
+        print(f"provider: {result.provider}")
+        print(f"fallback: {result.fallback_used}")
 
 
 asyncio.run(main())
 ```
 
+실행 결과:
+
+```text
+입력: 엑스피엔36 서버에서 어카운트넘버 사삼삼오삼칠의 트랜잭숑 로그
+출력: XPN36 server에서 account_no 433537의 transaction log
+provider: azure-foundry
+fallback: False
+```
+
+이 예제에서 exact mapping과 숫자 변환은 로컬에서 처리되고, 발음 후보인 `트랜잭숑 → transaction`은 Foundry가 후보 ID를 선택합니다. 모델이 `keep` 또는 `abstain`을 선택하면 해당 입력은 그대로 보존될 수 있습니다.
+
 ### Ollama — 명시적 선택
 
 ```python
 with AgenticPronunciationMapper(
-    db_terms=["customer", "transaction", "server"],
+    db_terms=["customer", "transaction", "server", "log"],
+    custom_mappings={
+        "서버": "server",
+        "로그": "log",
+    },
     provider="ollama",
     provider_options={"model": "qwen3.5:4b"},
 ) as mapper:
-    result = mapper.rewrite_sync("트랜잭숑 서버 로그")
-    print(result.rewritten_text)
+    query = "트랜잭숑 서버 로그"
+    result = mapper.rewrite_sync(query)
+
+    print(f"입력: {query}")
+    print(f"출력: {result.rewritten_text}")
+    print(f"provider: {result.provider}")
 ```
+
+실행 결과 예시:
+
+```text
+입력: 트랜잭숑 서버 로그
+출력: transaction server log
+provider: ollama
+```
+
+모델의 `confidence`, 판단 근거, latency와 token usage는 실행마다 달라질 수 있습니다. 상세 정보가 필요하면 `result.to_dict()`를 출력하세요.
 
 이미 event loop가 실행 중이면 `rewrite_sync()` 대신 `await rewrite()`를 사용해야 합니다.
 factory가 만든 provider는 mapper context manager가 종료합니다. 직접 주입한 custom provider/client의 수명은 호출자가 관리합니다.
@@ -191,6 +223,16 @@ mapper = PronunciationMapper(
 
 term, distance = mapper.find_closest_term("커스터머")
 sentence = mapper.map_sentence("커스터머,  서버에서 조회")
+
+print(f"단어: 커스터머 → {term} (distance={distance:.1f})")
+print(f"문장: 커스터머,  서버에서 조회 → {sentence}")
+```
+
+실행 결과:
+
+```text
+단어: 커스터머 → customer (distance=0.0)
+문장: 커스터머,  서버에서 조회 → customer,  server에서 조회
 ```
 
 V1 클래스는 네트워크나 Azure credential을 요구하지 않습니다. V2에서도 exact mapping, 발음 후보 생성, provider fallback의 로컬 계층으로 사용됩니다.
@@ -213,7 +255,12 @@ python evals/run_v2.py --provider ollama
 
 ## 문서
 
+- [문서와 기록 안내](docs/README.md)
+- [변경 기록](CHANGELOG.md)
+- [V2.0.0 릴리스 기록](docs/releases/v2.0.0.md)
 - [V2 아키텍처와 마이그레이션](docs/V2_ARCHITECTURE.md)
+- [아키텍처 결정 기록](docs/decisions/README.md)
+- [GitHub Actions와 외부 tenant Foundry OIDC 설정](docs/CI_SETUP.md)
 - [V2 eval dataset](evals/cases.jsonl)
 - [환경 변수 예시](.env.example)
 

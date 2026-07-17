@@ -34,12 +34,30 @@ export OLLAMA_MODEL='qwen3.5:4b'
 from pronunciation_mapper import AgenticPronunciationMapper
 
 with AgenticPronunciationMapper(
-    ["XPN36", "account_no", "transaction", "server"],
-    custom_mappings={"엑스피엔36": "XPN36", "서버": "server"},
+    ["XPN36", "account_no", "transaction", "server", "log"],
+    custom_mappings={
+        "엑스피엔36": "XPN36",
+        "서버": "server",
+        "로그": "log",
+    },
 ) as mapper:
-    result = mapper.rewrite_sync("엑스피엔36 서버에서 트랜잭숑 로그")
-    print(result.rewritten_text)
+    query = "엑스피엔36 서버에서 트랜잭숑 로그"
+    result = mapper.rewrite_sync(query)
+
+    print(f"Input: {query}")
+    print(f"Output: {result.rewritten_text}")
+    print(f"Provider: {result.provider}")
 ```
+
+Example output:
+
+```text
+Input: 엑스피엔36 서버에서 트랜잭숑 로그
+Output: XPN36 server에서 transaction log
+Provider: azure-foundry
+```
+
+Exact aliases are applied locally. Ambiguous phonetic candidates are selected by the configured provider, so confidence, latency, usage, and `keep`/`abstain` decisions may vary. Use `result.to_dict()` when you need the full decision trace.
 
 Factory-created providers are closed by the mapper context manager. Injected custom providers and clients remain caller-owned. Defaults bound untrusted work to 4,096 input characters, 64 lexical spans, and 256 characters per token. Foundry requests use a 30-second timeout, one retry, and a 2,048-token output cap; each limit is configurable.
 
@@ -47,4 +65,4 @@ Korean number normalization is intentionally conservative. Explicit units/counte
 
 The original `PronunciationMapper` class and CLI commands remain available and never require network credentials.
 
-See [the V2 architecture document](docs/V2_ARCHITECTURE.md) and the full Korean [README](README.md).
+See the [documentation index](docs/README.md), [changelog](CHANGELOG.md), [V2 architecture document](docs/V2_ARCHITECTURE.md), [V2.0.0 release record](docs/releases/v2.0.0.md), the [GitHub Actions and external-tenant Foundry OIDC setup](docs/CI_SETUP.md), and the full Korean [README](README.md).

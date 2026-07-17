@@ -3,9 +3,15 @@
 
 import argparse
 import asyncio
+import hashlib
 import json
+import math
+import os
+import platform
 import statistics
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -13,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pronunciation_mapper import __version__
 from pronunciation_mapper.v2 import AgenticPronunciationMapper, ProviderUnavailableError
 
 
@@ -30,6 +37,24 @@ def parse_args():
     parser.add_argument("--cases", type=Path, default=ROOT / "evals" / "cases.jsonl")
     parser.add_argument("--vocabulary", type=Path, default=ROOT / "evals" / "vocabulary.json")
     parser.add_argument("--fail-under", type=float, default=1.0)
+    parser.add_argument(
+        "--max-fallback-rate",
+        type=float,
+        default=1.0,
+        help="fail when provider fallback exceeds this fraction (default: 1.0)",
+    )
+    parser.add_argument(
+        "--min-provider-results",
+        type=int,
+        default=0,
+        help="require at least this many non-fallback results from the selected provider",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=ROOT / "evals" / "results" / "latest.json",
+        help="JSON report path",
+    )
     return parser.parse_args()
 
 
@@ -52,6 +77,123 @@ def percentile(values, fraction):
     ordered = sorted(values)
     index = min(len(ordered) - 1, round((len(ordered) - 1) * fraction))
     return ordered[index]
+
+
+def release_gate_failures(
+    metrics,
+    *,
+    fail_under,
+    max_fallback_rate,
+    min_provider_results,
+):
+    """Return human-readable reasons that an eval cannot be released."""
+    failures = []
+    if metrics["exact_accuracy"] < fail_under:
+        failures.append(
+            f"exact_accuracy {metrics['exact_accuracy']:.6f} is below {fail_under:.6f}"
+        )
+    if metrics["fallback_rate"] > max_fallback_rate:
+        failures.append(
+            f"fallback_rate {metrics['fallback_rate']:.6f} exceeds {max_fallback_rate:.6f}"
+        )
+    if metrics["provider_result_count"] < min_provider_results:
+        failures.append(
+            "provider_result_count "
+            f"{metrics['provider_result_count']} is below {min_provider_results}"
+        )
+    return failures
+
+
+def validate_gate_args(args):
+    for name in ("fail_under", "max_fallback_rate"):
+        value = getattr(args, name)
+        if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            option = name.replace("_", "-")
+            raise SystemExit(f"--{option} must be between 0 and 1")
+    if args.min_provider_results < 0:
+        raise SystemExit("--min-provider-results must be at least 0")
+
+
+def build_report_metadata(args, rows):
+    revision, revision_dirty = _git_state()
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "revision": revision,
+        "revision_dirty": revision_dirty,
+        "package_version": __version__,
+        "python_version": platform.python_version(),
+        "inputs": {
+            "cases": {
+                "path": _portable_path(args.cases),
+                "sha256": _sha256(args.cases),
+            },
+            "vocabulary": {
+                "path": _portable_path(args.vocabulary),
+                "sha256": _sha256(args.vocabulary),
+            },
+        },
+        "execution": {
+            "provider": args.provider,
+            "models": sorted({row["model"] for row in rows if row["model"]}),
+            "credential_mode": _credential_mode(args.provider),
+        },
+        "release_gate": {
+            "fail_under": args.fail_under,
+            "max_fallback_rate": args.max_fallback_rate,
+            "min_provider_results": args.min_provider_results,
+        },
+    }
+
+
+def _sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _portable_path(path):
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return path.name
+
+
+def _credential_mode(provider):
+    if provider == "offline":
+        return "none"
+    if provider == "ollama":
+        return "local-ollama"
+    configured = os.getenv("AZURE_TOKEN_CREDENTIALS")
+    allowed = {
+        "AzureCliCredential",
+        "DefaultAzureCredential",
+        "ManagedIdentityCredential",
+        "WorkloadIdentityCredential",
+    }
+    return configured if configured in allowed else "DefaultAzureCredential"
+
+
+def _git_state():
+    revision = os.getenv("EVAL_GIT_SHA") or os.getenv("GITHUB_SHA")
+    try:
+        if not revision:
+            revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return revision or None, None
+    return revision or None, dirty
 
 
 async def run(args):
@@ -92,19 +234,33 @@ async def run(args):
     preserve_rows = [row for row in rows if not row["should_change"]]
     false_rewrites = sum(row["actual"] != row["expected"] for row in preserve_rows)
     latencies = [row["latency_ms"] for row in rows]
+    expected_provider = {
+        "azure": "azure-foundry",
+        "ollama": "ollama",
+    }.get(args.provider)
+    provider_result_count = sum(
+        not row["fallback_used"] and row["provider"] == expected_provider
+        for row in rows
+    )
     metrics = {
         "case_count": len(rows),
         "exact_accuracy": passed_count / len(rows) if rows else 0.0,
         "false_rewrite_rate": false_rewrites / len(preserve_rows) if preserve_rows else 0.0,
         "fallback_rate": sum(row["fallback_used"] for row in rows) / len(rows) if rows else 0.0,
+        "provider_result_count": provider_result_count,
         "latency_p50_ms": round(statistics.median(latencies), 3) if latencies else 0.0,
         "latency_p95_ms": round(percentile(latencies, 0.95), 3),
     }
-    report = {"provider": args.provider, "metrics": metrics, "cases": rows}
+    report = {
+        "schema_version": 1,
+        "metadata": build_report_metadata(args, rows),
+        "provider": args.provider,
+        "metrics": metrics,
+        "cases": rows,
+    }
 
-    output_dir = ROOT / "evals" / "results"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "latest.json"
+    output_path = args.output
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
@@ -112,13 +268,20 @@ async def run(args):
         marker = "PASS" if row["passed"] else "FAIL"
         print(f"[{marker}] {row['id']}: {row['actual']}")
     print(f"report: {output_path}")
-    return 0 if metrics["exact_accuracy"] >= args.fail_under else 1
+    failures = release_gate_failures(
+        metrics,
+        fail_under=args.fail_under,
+        max_fallback_rate=args.max_fallback_rate,
+        min_provider_results=args.min_provider_results,
+    )
+    for failure in failures:
+        print(f"[GATE] {failure}", file=sys.stderr)
+    return 1 if failures else 0
 
 
 def main():
     args = parse_args()
-    if not 0.0 <= args.fail_under <= 1.0:
-        raise SystemExit("--fail-under must be between 0 and 1")
+    validate_gate_args(args)
     raise SystemExit(asyncio.run(run(args)))
 
 
