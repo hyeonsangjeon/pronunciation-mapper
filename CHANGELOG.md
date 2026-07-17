@@ -4,7 +4,9 @@
 
 ## [Unreleased]
 
-예정 릴리스: `2.0.0`
+릴리스 이후 변경 사항은 여기에 기록합니다.
+
+## [2.0.0] - 2026-07-17
 
 ### Added
 
@@ -49,5 +51,6 @@
 - Levenshtein 거리, 직접 mapping, 한국어 조사 보존, 숫자 변환.
 - 단어·문장 mapping과 사용자 mapping 저장을 위한 V1 API 및 CLI.
 
-[Unreleased]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/315aecf...HEAD
+[Unreleased]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/315aecf...v2.0.0
 [0.1.0]: https://github.com/hyeonsangjeon/pronunciation-mapper/tree/315aecf
