@@ -49,7 +49,7 @@ def process_audio_query(audio_file):
     print(f"매핑 결과: {mapped_text}")
     
     # 3. DB 쿼리 생성 (실제로는 NLU 모듈 필요 : ex : TEXT2SQL)
-    print(f"DB 쿼리 준비 완료: 표준화된 용어로 쿼리 실행\n")
+    print("DB 쿼리 준비 완료: 표준화된 용어로 쿼리 실행\n")
     return mapped_text
 
 # 테스트

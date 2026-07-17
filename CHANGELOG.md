@@ -6,6 +6,25 @@
 
 릴리스 이후 변경 사항은 여기에 기록합니다.
 
+## [2.0.1] - 2026-07-17
+
+### Fixed
+
+- 영어 canonical term과 숫자 문맥 단어 뒤의 한국어 조사 `이`·`만`이 숫자로 변환되던 문제와 rewrite 비멱등성을 수정.
+- `find_closest_term()`의 호출별 `threshold`가 bool, non-finite 또는 `0..1` 밖의 값을 허용하던 문제를 수정.
+- PyPI 설치 환경의 optional provider 오류가 editable source install 명령을 안내하던 문제를 수정.
+- source distribution에서 eval runner 자산이 빠져 독립 테스트 collection이 실패하던 문제를 수정.
+
+### Changed
+
+- README의 provider 선택표, 로컬 입력·출력 예제, PyPI/CI/Python/license badge와 월간 다운로드 카운터를 정리.
+- Ruff를 CI release gate에 추가하고 package version, tag와 runtime `__version__`의 일치를 게시 workflow에서 검증.
+- 수동 PyPI 게시 workflow에서 낡은 기본 tag를 제거해 version을 명시적으로 입력하도록 변경.
+
+### Security
+
+- Ollama 요청에 기본 2,048 output token 상한을 적용하고 thinking mode를 비활성화해 비정상적으로 긴 structured response를 제한.
+
 ## [2.0.0] - 2026-07-17
 
 ### Added
@@ -51,6 +70,7 @@
 - Levenshtein 거리, 직접 mapping, 한국어 조사 보존, 숫자 변환.
 - 단어·문장 mapping과 사용자 mapping 저장을 위한 V1 API 및 CLI.
 
-[Unreleased]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/hyeonsangjeon/pronunciation-mapper/compare/315aecf...v2.0.0
 [0.1.0]: https://github.com/hyeonsangjeon/pronunciation-mapper/tree/315aecf

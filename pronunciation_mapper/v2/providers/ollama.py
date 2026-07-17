@@ -21,12 +21,20 @@ class OllamaProvider:
         host: str | None = None,
         model: str | None = None,
         timeout: float = 30.0,
+        max_output_tokens: int = 2048,
         keep_alive: str = "5m",
         client: Any | None = None,
     ):
         self.host = host or os.getenv("OLLAMA_HOST") or "http://localhost:11434"
         self.model = model or os.getenv("OLLAMA_MODEL") or "qwen3.5:4b"
         self.timeout = _positive_float(timeout, "timeout")
+        if (
+            isinstance(max_output_tokens, bool)
+            or not isinstance(max_output_tokens, int)
+            or max_output_tokens <= 0
+        ):
+            raise ValueError("max_output_tokens must be a positive integer")
+        self.max_output_tokens = max_output_tokens
         self.keep_alive = keep_alive
         self._client = client
 
@@ -54,7 +62,8 @@ class OllamaProvider:
                 ],
                 format=DECISION_SCHEMA,
                 stream=False,
-                options={"temperature": 0},
+                think=False,
+                options={"temperature": 0, "num_predict": self.max_output_tokens},
                 keep_alive=self.keep_alive,
             )
         except BaseException as error:
@@ -113,7 +122,8 @@ class OllamaProvider:
             from ollama import AsyncClient
         except ImportError as error:
             raise ProviderConfigurationError(
-                "Install the Ollama extra with: pip install -e '.[ollama]'"
+                "Install the Ollama extra with: "
+                "python -m pip install 'pronunciation-mapper[ollama]'"
             ) from error
         return AsyncClient
 

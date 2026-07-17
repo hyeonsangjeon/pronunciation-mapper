@@ -12,7 +12,6 @@ on:
         description: Existing annotated release tag to build and publish
         required: true
         type: string
-        default: v2.0.0
 
 permissions:
   contents: read
@@ -86,12 +85,35 @@ jobs:
         run: |
           python - <<'PY'
           import os
+          import ast
           import pathlib
           import tomllib
 
+          root = pathlib.Path(".")
           version = tomllib.loads(
               pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
           )["project"]["version"]
+          init_tree = ast.parse(
+              (root / "pronunciation_mapper" / "__init__.py").read_text(
+                  encoding="utf-8"
+              )
+          )
+          package_version = next(
+              node.value.value
+              for node in init_tree.body
+              if isinstance(node, ast.Assign)
+              and any(
+                  isinstance(target, ast.Name) and target.id == "__version__"
+                  for target in node.targets
+              )
+              and isinstance(node.value, ast.Constant)
+              and isinstance(node.value.value, str)
+          )
+          if package_version != version:
+              raise SystemExit(
+                  f"package __version__ {package_version!r} does not match "
+                  f"pyproject version {version!r}"
+              )
           expected_tag = f"v{version}"
           actual_tag = os.environ["RELEASE_TAG"]
           if actual_tag != expected_tag:

@@ -1,6 +1,7 @@
 """결정적 발음 후보 생성기와 V1 호환 매퍼."""
 
 import logging
+import math
 import re
 from collections.abc import Mapping
 
@@ -18,6 +19,14 @@ KOREAN_PARTICLES = (
     "은", "는", "도", "만",
 )
 LEXICAL_TOKEN_PATTERN = re.compile(r"[가-힣A-Za-z0-9_]+")
+
+
+def _is_unit_interval_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    if isinstance(value, float) and not math.isfinite(value):
+        return False
+    return 0.0 <= value <= 1.0
 
 
 def split_korean_particle(word):
@@ -41,9 +50,9 @@ class PronunciationMapper:
         raw_terms = list(db_terms)
         if any(not isinstance(term, str) or not term for term in raw_terms):
             raise ValueError("db_terms must contain only non-empty strings")
-        if isinstance(threshold, bool) or not isinstance(
-            DEFAULT_THRESHOLD if threshold is None else threshold, (int, float)
-        ) or not 0.0 <= (DEFAULT_THRESHOLD if threshold is None else threshold) <= 1.0:
+        if not _is_unit_interval_number(
+            DEFAULT_THRESHOLD if threshold is None else threshold
+        ):
             raise ValueError("threshold must be between 0 and 1")
         if custom_mappings is not None:
             if not isinstance(custom_mappings, Mapping):
@@ -259,10 +268,14 @@ class PronunciationMapper:
         반환값은 ``[(replacement, distance), ...]``이며 조사가 있으면 replacement에
         보존됩니다. ``distance``는 V1과 동일하게 0이 가장 가깝습니다.
         """
+        normalized = convert_korean_numbers_correctly(query_term)
+        return self._rank_candidates_normalized(normalized, limit=limit)
+
+    def _rank_candidates_normalized(self, normalized, limit=5):
+        """이미 숫자 정규화된 토큰의 발음 후보를 반환합니다."""
         if limit < 1:
             return []
 
-        normalized = convert_korean_numbers_correctly(query_term)
         scores = {}
 
         direct = self._direct_target(normalized)
@@ -325,8 +338,13 @@ class PronunciationMapper:
     def find_closest_term(self, query_term, threshold=None):
         """쿼리 용어와 가장 가까운 DB 용어를 ``(문자열, 거리)``로 반환합니다."""
         threshold = self.threshold if threshold is None else threshold
+        if not _is_unit_interval_number(threshold):
+            raise ValueError("threshold must be between 0 and 1")
         normalized = convert_korean_numbers_correctly(query_term)
+        return self._find_closest_normalized(normalized, threshold)
 
+    def _find_closest_normalized(self, normalized, threshold):
+        """이미 숫자 정규화된 토큰에서 가장 가까운 DB 용어를 찾습니다."""
         direct = self._direct_target(normalized)
         if direct:
             return direct, 0.0
@@ -344,7 +362,7 @@ class PronunciationMapper:
         if alias_replacement is not None:
             return alias_replacement, 0.1
 
-        ranked = self.rank_candidates(normalized, limit=1)
+        ranked = self._rank_candidates_normalized(normalized, limit=1)
         if ranked and ranked[0][1] <= threshold:
             return ranked[0]
         return normalized, 1.0
@@ -362,7 +380,9 @@ class PronunciationMapper:
             alias_replacement, _ = self.replace_known_aliases(match.group(0))
             if overlaps_canonical and alias_replacement is None:
                 return match.group(0)
-            mapped, _ = self.find_closest_term(match.group(0))
+            mapped, _ = self._find_closest_normalized(
+                match.group(0), self.threshold
+            )
             return mapped
 
         return LEXICAL_TOKEN_PATTERN.sub(replace, normalized)

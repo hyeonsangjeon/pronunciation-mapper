@@ -189,6 +189,15 @@ class TestProviderAdapters(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.usage["input_tokens"], 9)
         self.assertEqual(client.kwargs["format"]["type"], "object")
         self.assertEqual(client.kwargs["options"]["temperature"], 0)
+        self.assertEqual(client.kwargs["options"]["num_predict"], 2048)
+        self.assertFalse(client.kwargs["think"])
+
+        limited_client = FakeOllamaClient()
+        limited_provider = OllamaProvider(
+            model="qwen", client=limited_client, max_output_tokens=321
+        )
+        await limited_provider.decide(request_fixture())
+        self.assertEqual(limited_client.kwargs["options"]["num_predict"], 321)
 
     async def test_foundry_validates_model_before_creating_client(self):
         provider = AzureFoundryProvider(endpoint="https://example", model="deployment")
@@ -384,6 +393,8 @@ class TestProviderAdapters(unittest.IsolatedAsyncioTestCase):
             with self.subTest(max_output_tokens=value):
                 with self.assertRaises(ValueError):
                     AzureFoundryProvider(max_output_tokens=value)
+                with self.assertRaises(ValueError):
+                    OllamaProvider(max_output_tokens=value)
 
 
 class TestOllamaSyncLoopSafety(unittest.TestCase):

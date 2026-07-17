@@ -140,8 +140,8 @@ class AzureFoundryProvider:
                     _close_sync(credential)
             except (TypeError, AssertionError):
                 raise
-            except Exception:
-                # Preserve the primary creation failure; close is best effort.
+            # Preserve the primary creation failure; close is best effort.
+            except Exception:  # nosec B110
                 pass
             raise_classified_provider_error("Microsoft Foundry", error)
 
@@ -160,7 +160,8 @@ class AzureFoundryProvider:
             from azure.identity import DefaultAzureCredential
         except ImportError as error:
             raise ProviderConfigurationError(
-                "Install the Azure extra with: pip install -e '.[foundry]'"
+                "Install the Foundry extra with: "
+                "python -m pip install 'pronunciation-mapper[foundry]'"
             ) from error
         return AIProjectClient, DefaultAzureCredential
 

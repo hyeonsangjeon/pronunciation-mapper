@@ -3,7 +3,7 @@
 - 상태: Accepted
 - 최초 기준일: 2026-07-16
 - 최종 검토일: 2026-07-17
-- 구현 기준: `v2.0.0` released
+- 구현 기준: `v2.0.1` release candidate
 
 ## 1. 문제 재정의
 
@@ -138,6 +138,7 @@ Ollama는 OpenAI-compatible endpoint가 아니라 공식 native `ollama.AsyncCli
 
 - 기본 host: `http://localhost:11434`
 - structured output: `format=<JSON Schema>`
+- generation guard: `think=False`, 기본 `num_predict=2048`, timeout 30초
 - temperature: `0`
 - non-streaming bounded decision
 - 모델 자동 pull 없음
@@ -252,7 +253,7 @@ async with AgenticPronunciationMapper(
 - GitHub OIDC workflow와 `ci-` 임시 deployment cleanup guard 구현·정적 검증
 - 실제 Foundry 결과 수와 fallback rate를 분리한 release gate
 
-검증 수치와 미완료 release 작업은 [V2.0.0 릴리스 기록](releases/v2.0.0.md)에 보존합니다.
+최신 검증 수치와 release 작업은 [V2.0.1 릴리스 기록](releases/v2.0.1.md)에, V2 최초 공개 증빙은 [V2.0.0 릴리스 기록](releases/v2.0.0.md)에 보존합니다.
 GitHub-hosted OIDC end-to-end 실행은 repository Environment와 Entra federation 구성 후 완료할 운영 작업입니다.
 
 ## 9. 다음 단계

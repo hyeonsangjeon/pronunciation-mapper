@@ -1,6 +1,5 @@
 import unittest
 import tempfile
-import json
 import os
 from pronunciation_mapper.mapper import PronunciationMapper
 from pronunciation_mapper.utils import load_mappings_from_file, save_mappings_to_file

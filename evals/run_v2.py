@@ -19,8 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from pronunciation_mapper import __version__
-from pronunciation_mapper.v2 import AgenticPronunciationMapper, ProviderUnavailableError
+from pronunciation_mapper import __version__  # noqa: E402
+from pronunciation_mapper.v2 import (  # noqa: E402
+    AgenticPronunciationMapper,
+    ProviderUnavailableError,
+)
 
 
 class OfflineProvider:

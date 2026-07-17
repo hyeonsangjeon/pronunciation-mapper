@@ -1,0 +1,16 @@
+include .env.example
+include CHANGELOG.md
+include README-EN.md
+include requirements.txt
+recursive-include .github/workflows *.yml
+include evals/run_v2.py
+include evals/cases.jsonl
+include evals/vocabulary.json
+include examples/db_terms.json
+include examples/v2_quickstart.py
+recursive-include docs *.md
+include docs/index.html
+include docs/script.js
+include docs/styles.css
+recursive-include scripts *.py
+recursive-include tests *.py

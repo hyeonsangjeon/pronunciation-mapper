@@ -52,7 +52,34 @@ class TestPronunciationMapper(unittest.TestCase):
         
         mapped_sentence = self.mapper.map_sentence(test_sentence)
         self.assertEqual(mapped_sentence, expected_sentence,
-                        f"Sentence mapping didn't produce expected result")
+                        "Sentence mapping didn't produce expected result")
+
+    def test_rewrite_is_idempotent_for_ascii_terms_with_korean_particles(self):
+        first = self.mapper.map_sentence("커스터머만")
+        second = self.mapper.map_sentence(first)
+
+        self.assertEqual(first, "customer만")
+        self.assertEqual(second, first)
+
+    def test_punctuation_separated_particles_are_preserved(self):
+        mapper = PronunciationMapper(["customer", "C++"])
+
+        for source in (
+            '"customer"만 조회',
+            "(customer)만 조회",
+            "C++만 조회",
+            "C++이 대상",
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(mapper.map_sentence(source), source)
+
+    def test_per_call_threshold_must_be_a_finite_unit_interval(self):
+        invalid_values = (True, -0.1, 1.1, float("nan"), float("inf"), 10**400, "0.5")
+
+        for threshold in invalid_values:
+            with self.subTest(threshold=threshold):
+                with self.assertRaises(ValueError):
+                    self.mapper.find_closest_term("zzzz", threshold=threshold)
 
 if __name__ == "__main__":
     unittest.main()

@@ -42,7 +42,7 @@ def convert_korean_numbers_correctly(text, special_cases=None):
                 arabic_num = korean_number_to_arabic(korean_str)
                 result = result[:start] + arabic_num + result[end:]
                 processed_ranges.append((start, end))
-            except:
+            except Exception:
                 pass
         # 숫자만 연속된 패턴 (예: 팔이사오)
         elif all(char in "영일이삼사오육칠팔구" for char in korean_str) and len(korean_str) > 1:

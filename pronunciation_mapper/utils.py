@@ -124,7 +124,7 @@ def convert_korean_numbers_correctly(text):
     counters = set("년번개명원시분초호회층대건차월")
     trailing_particles = (
         "에서", "으로", "에게", "한테", "처럼", "보다", "의", "은", "는",
-        "이", "가", "을", "를", "에", "로", "와", "과", "도",
+        "이", "가", "을", "를", "에", "로", "와", "과", "도", "만",
     )
     numeric_context_hints = (
         "번호", "넘버", "계정", "아이디", "전화", "주문", "코드",
@@ -167,6 +167,16 @@ def convert_korean_numbers_correctly(text):
         ):
             numeric_token = token[:-1]
             spoken_suffix = "이"
+
+        # lexical term/identifier 뒤에 붙은 ``이``와 ``만``은 숫자 2나
+        # 10,000이 아니라 한국어 조사입니다. 숫자 정규화를 다시 적용해도
+        # 이미 rewrite된 canonical text가 변하지 않도록 보존합니다.
+        attached_to_lexical_term = bool(
+            (left and (left.isalnum() or left == "_"))
+            or re.search(r"\w+[^\w\s]+$", prefix)
+        )
+        if attached_to_lexical_term and token in trailing_particles:
+            return token
 
         # ``고객만``의 조사나 ``참조``의 끝 음절처럼 한 글자 단위가 일반
         # 단어에 붙어 있으면 보존합니다. 단독 ``십``/``백``은 변환됩니다.
