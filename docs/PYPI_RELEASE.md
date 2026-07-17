@@ -41,6 +41,19 @@ gh run list --workflow pypi-publish.yml --limit 1
 
 새 프로젝트를 처음 게시할 때는 PyPI 계정의 **Publishing → Add a new pending publisher**에서 위 identity를 먼저 등록합니다. Pending Publisher는 이름을 예약하지 않으며, 처음 성공한 trusted publish가 프로젝트를 생성하면서 일반 publisher로 전환합니다. Workflow는 요청한 tag를 checkout하고 `pyproject.toml`의 version과 tag가 일치하는지 확인합니다. 이미 게시된 동일 version은 덮어쓰지 않습니다.
 
+## V2.0.1 자동 게시 결과
+
+`v2.0.1`은 2026-07-17에 [GitHub Release](https://github.com/hyeonsangjeon/pronunciation-mapper/releases/tag/v2.0.1)를 게시해 `release.published` event로 [GitHub Actions run 29569638247](https://github.com/hyeonsangjeon/pronunciation-mapper/actions/runs/29569638247)을 자동 실행했습니다.
+
+- [PyPI 2.0.1](https://pypi.org/project/pronunciation-mapper/2.0.1/): universal wheel과 source distribution
+- tag·version guard: annotated `v2.0.1`, `pyproject.toml`, runtime `__version__` 일치 검증
+- 게시 방식: `pypi` Environment의 OIDC Trusted Publishing; password·API token 없음
+- provenance: wheel·sdist 모두 repository, workflow, Environment identity 일치
+- 서명 검증: `pypi-attestations` 암호학적 검증 `OK`
+- 설치 검증: 새 Python 3.11 환경에서 `pronunciation-mapper==2.0.1`, import, CLI, mapping, `pip check` 성공
+
+상세 file digest와 검증 절차는 [V2.0.1 릴리스 기록](releases/v2.0.1.md)에 보존합니다.
+
 ## 이후 릴리스
 
 1. CHANGELOG와 release record를 새 version으로 마감합니다.
